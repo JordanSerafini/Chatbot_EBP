@@ -22,6 +22,19 @@ interface DatabaseConfig {
   database: string;
 }
 
+// Fonction utilitaire pour entourer les identifiants de guillemets doubles
+function quoteIdentifiers(sql: string): string {
+  // FROM Customer => FROM "Customer"
+  sql = sql.replace(/FROM ([a-zA-Z_][a-zA-Z0-9_]*)/g, 'FROM "$1"');
+  // JOIN Table => JOIN "Table"
+  sql = sql.replace(/JOIN ([a-zA-Z_][a-zA-Z0-9_]*)/g, 'JOIN "$1"');
+  // ORDER BY colonne => ORDER BY "colonne"
+  sql = sql.replace(/ORDER BY ([a-zA-Z_][a-zA-Z0-9_]*)/g, 'ORDER BY "$1"');
+  // SELECT colonne, ... => SELECT "colonne", ... (uniquement pour SELECT * non concerné)
+  sql = sql.replace(/SELECT ([a-zA-Z_][a-zA-Z0-9_]*)(,|\s|$)/g, 'SELECT "$1"$2');
+  return sql;
+}
+
 class EBPMCPServer {
   private server: Server;
   private pool!: Pool;
@@ -297,8 +310,15 @@ class EBPMCPServer {
         throw new Error('Seules les requêtes SELECT et EXPLAIN sont autorisées.');
       }
 
-      // Ne pas ajouter de LIMIT aux requêtes EXPLAIN
-      const finalQuery = cleanedQuery.startsWith('explain') ? query : `${query} LIMIT ${limit}`;
+      // Ne pas ajouter de LIMIT si déjà présent
+      let finalQuery: string;
+      if (cleanedQuery.startsWith('explain')) {
+        finalQuery = quoteIdentifiers(query);
+      } else if (/limit\s+\d+/i.test(query)) {
+        finalQuery = quoteIdentifiers(query);
+      } else {
+        finalQuery = quoteIdentifiers(`${query} LIMIT ${limit}`);
+      }
       const result = await client.query(finalQuery);
 
       return {

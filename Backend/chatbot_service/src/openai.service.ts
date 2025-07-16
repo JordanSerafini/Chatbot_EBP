@@ -90,63 +90,96 @@ export class OpenAIService {
     ];
     let loopCount = 0;
     let lastResponse: any = null;
-    while (loopCount < 3) {
-      loopCount++;
-      const response = await axios.post(
-        this.openAIUrl,
-        {
-          model: 'gpt-4o',
-          messages,
-          functions: this.getFunctions(),
-          function_call: 'auto',
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.openAIApiKey}`,
-            'Content-Type': 'application/json',
+    let lastFunctionResult: any = null; // Pour stocker le dernier résultat MCP
+    try {
+      while (loopCount < 3) {
+        loopCount++;
+        const response = await axios.post(
+          this.openAIUrl,
+          {
+            model: 'gpt-4o',
+            messages,
+            functions: this.getFunctions(),
+            function_call: 'auto',
           },
-        },
-      );
-      const choice = response.data.choices[0];
-      const msg = choice.message;
-      if (msg.function_call) {
-        // Appel d'un tool MCP demandé par OpenAI
-        const { name, arguments: argsStr } = msg.function_call;
-        let args: any = {};
-        try {
-          args = JSON.parse(argsStr);
-        } catch (e) {
-          this.logger.error('Erreur parsing arguments function_call:', argsStr);
+          {
+            headers: {
+              Authorization: `Bearer ${this.openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        );
+        const choice = response.data.choices[0];
+        const msg = choice.message;
+        if (msg.function_call) {
+          // Appel d'un tool MCP demandé par OpenAI
+          const { name, arguments: argsStr } = msg.function_call;
+          let args: any = {};
+          try {
+            args = JSON.parse(argsStr);
+          } catch (e) {
+            this.logger.error('Erreur parsing arguments function_call:', argsStr);
+          }
+          let result: any = null;
+          if (name === 'queryMCP') {
+            result = await this.mcpClient.executeQuery(
+              args.query,
+              args.limit || 100,
+            );
+          } else if (name === 'listTablesMCP') {
+            result = await this.mcpClient.listTables();
+          } else if (name === 'describeTableMCP') {
+            result = await this.mcpClient.describeTable(args.tableName);
+          } else if (name === 'analyzeTableMCP') {
+            result = await this.mcpClient.analyzeTable(
+              args.tableName,
+              args.columns,
+            );
+          } else if (name === 'getSchemaMCP') {
+            result = await this.mcpClient.getSchema();
+          }
+          lastFunctionResult = result; // On stocke le dernier résultat MCP
+          messages.push({
+            role: 'function',
+            name,
+            content: JSON.stringify(result),
+          } as any);
+          continue; // relance la boucle pour obtenir la réponse finale
+        } else if (msg.content) {
+          lastResponse = msg.content;
+          break;
         }
-        let result: any = null;
-        if (name === 'queryMCP') {
-          result = await this.mcpClient.executeQuery(
-            args.query,
-            args.limit || 100,
-          );
-        } else if (name === 'listTablesMCP') {
-          result = await this.mcpClient.listTables();
-        } else if (name === 'describeTableMCP') {
-          result = await this.mcpClient.describeTable(args.tableName);
-        } else if (name === 'analyzeTableMCP') {
-          result = await this.mcpClient.analyzeTable(
-            args.tableName,
-            args.columns,
-          );
-        } else if (name === 'getSchemaMCP') {
-          result = await this.mcpClient.getSchema();
-        }
-        messages.push({
-          role: 'function',
-          name,
-          content: JSON.stringify(result),
-        } as any);
-        continue; // relance la boucle pour obtenir la réponse finale
-      } else if (msg.content) {
-        lastResponse = msg.content;
-        break;
       }
+      // Si aucune réponse textuelle, on retourne les données brutes MCP formatées
+      if (!lastResponse && lastFunctionResult) {
+        // On tente d'afficher joliment les données SQL si présentes
+        if (lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
+          if (lastFunctionResult.data.length === 0) {
+            return 'Aucune donnée trouvée.';
+          }
+          // On affiche les 5 premières lignes max
+          const preview = lastFunctionResult.data.slice(0, 5);
+          const columns = Object.keys(preview[0]);
+          const header = columns.join(' | ');
+          const rows = preview.map(row => columns.map(col => String(row[col])).join(' | '));
+          return [
+            'Voici un aperçu des résultats :',
+            '```' + header,
+            ...rows,
+            '```',
+            preview.length < lastFunctionResult.data.length ? `... (${lastFunctionResult.data.length} lignes au total)` : ''
+          ].filter(Boolean).join('\n');
+        } else {
+          // Sinon, on retourne le JSON brut
+          return 'Résultat brut :\n' + JSON.stringify(lastFunctionResult, null, 2);
+        }
+      }
+      return lastResponse || 'Aucune réponse générée.';
+    } catch (error: any) {
+      // Log uniquement le message d'erreur principal, tronqué si besoin
+      const errMsg = error?.message ? String(error.message).slice(0, 300) : 'Erreur inconnue';
+      this.logger.error('Erreur OpenAIService:', errMsg);
+      return 'Erreur lors du traitement : ' + errMsg;
     }
-    return lastResponse || 'Aucune réponse générée.';
   }
 }

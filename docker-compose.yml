@@ -16,8 +16,7 @@ services:
       - LOG_LEVEL=info
     ports:
       - "3000:3000"
-    networks:
-      - ebp-network
+
 
   chatbot-service:
     build:
@@ -29,12 +28,9 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - MCP_SERVER_URL=${MCP_SERVER_URL} 
-    networks:
-      - ebp-network
+
 
 volumes:
   postgres_sync_data:
 
-networks:
-  ebp-network:
-    driver: bridge
+

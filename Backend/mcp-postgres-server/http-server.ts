@@ -179,6 +179,7 @@ class McpHttpServer {
               return;
             } catch (e) {
               // Si l'extraction JSON échoue, retourner le texte complet
+              console.log('DEBUG MCP /api/tools/:toolName JSON extraction failed:', e);
             }
           }
           
@@ -325,10 +326,11 @@ class McpHttpServer {
           arguments: { query, limit }
         });
 
-        // Extraire les données depuis la structure MCP content
+        // DEBUG : log du résultat brut
+        console.log('DEBUG MCP /api/query result:', JSON.stringify(result));
         if (result && result.content && Array.isArray(result.content) && result.content[0]) {
           const contentText = result.content[0].text;
-          
+          console.log('DEBUG MCP /api/query contentText:', contentText);
           // Essayer d'extraire les données JSON
           const dataMatch = contentText.match(/📋 Données:\n(\[[\s\S]*?\])/);
           if (dataMatch) {
@@ -343,20 +345,31 @@ class McpHttpServer {
               return;
             } catch (e) {
               // Si l'extraction JSON échoue, retourner le texte complet
+              console.log('DEBUG MCP /api/query JSON.parse error:', e);
+              res.json({
+                success: true,
+                data: contentText,
+                rawContent: result,
+                warning: 'Impossible de parser le JSON, retour texte brut.'
+              });
+              return;
             }
           }
-          
-          // Retourner le texte formaté
+          // Si pas de match JSON, retourne le texte brut
           res.json({
             success: true,
             data: contentText,
-            rawContent: result
+            rawContent: result,
+            warning: 'Pas de données JSON détectées, retour texte brut.'
           });
+          return;
         } else {
           res.json(result);
         }
       } catch (error: any) {
-        res.status(500).json({ error: error.message });
+        // Log uniquement le message d'erreur principal
+        console.error('Erreur /api/query:', error?.message || error);
+        res.status(500).json({ error: error?.message || 'Erreur inconnue' });
       }
     });
 

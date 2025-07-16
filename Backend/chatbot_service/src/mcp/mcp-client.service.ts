@@ -20,15 +20,40 @@ export class MCPClientService {
 
   async executeQuery(query: string, limit = 100): Promise<any> {
     console.log('[MCP] SQL envoyé à MCP :', query);
-    // Validation simple : LIMIT doit être suivi d'un nombre
-    if (/LIMIT\s*;?$/i.test(query)) {
+
+    // Validation : LIMIT doit être suivi d'un nombre
+    const limitRegex = /LIMIT\s*;?$/i;
+    if (limitRegex.test(query)) {
       throw new Error('Requête SQL incomplète : LIMIT sans nombre');
     }
-    // On pourrait ajouter d'autres validations ici
+
+    // Correction automatique : si pas de LIMIT, on l’ajoute
+    if (!/LIMIT\s+\d+/i.test(query)) {
+      // Ajoute LIMIT à la fin si absent
+      if (query.trim().endsWith(';')) {
+        query = query.trim().replace(/;$/, ` LIMIT ${limit};`);
+      } else {
+        query = `${query.trim()} LIMIT ${limit};`;
+      }
+      console.log('[MCP] SQL corrigé avec LIMIT :', query);
+    }
+
     const response = await lastValueFrom(
       this.httpService.post(`${this.baseUrl}/api/query`, { query, limit }),
     );
-    console.log('[MCP] Résultat executeQuery:', response.data);
+    if (Array.isArray(response.data)) {
+      console.log(
+        '[MCP] Résultat executeQuery: lignes retournées =',
+        response.data.length,
+      );
+    } else {
+      const preview = JSON.stringify(response.data);
+      console.log(
+        '[MCP] Résultat executeQuery (extrait) :',
+        preview.slice(0, 300),
+        '...',
+      );
+    }
     return response.data;
   }
 
@@ -39,7 +64,19 @@ export class MCPClientService {
         params: { schema },
       }),
     );
-    console.log('[MCP] Résultat listTables:', response.data);
+    if (Array.isArray(response.data)) {
+      console.log(
+        '[MCP] Résultat listTables: lignes retournées =',
+        response.data.length,
+      );
+    } else {
+      const preview = JSON.stringify(response.data);
+      console.log(
+        '[MCP] Résultat listTables (extrait) :',
+        preview.slice(0, 300),
+        '...',
+      );
+    }
     return response.data;
   }
 
@@ -50,7 +87,12 @@ export class MCPClientService {
         params: { schema },
       }),
     );
-    console.log('[MCP] Résultat describeTable:', response.data);
+    const preview = JSON.stringify(response.data);
+    console.log(
+      '[MCP] Résultat describeTable (extrait) :',
+      preview.slice(0, 300),
+      '...',
+    );
     return response.data;
   }
 
@@ -61,7 +103,12 @@ export class MCPClientService {
         columns,
       }),
     );
-    console.log('[MCP] Résultat analyzeTable:', response.data);
+    const preview = JSON.stringify(response.data);
+    console.log(
+      '[MCP] Résultat analyzeTable (extrait) :',
+      preview.slice(0, 300),
+      '...',
+    );
     return response.data;
   }
 
@@ -70,24 +117,12 @@ export class MCPClientService {
     const response = await lastValueFrom(
       this.httpService.get(`${this.baseUrl}/api/schema`),
     );
-    console.log('[MCP] Résultat getSchema:', response.data);
-    return response.data;
-  }
-
-  // Ancienne méthode pour compatibilité temporaire
-  async query(sql: string): Promise<any> {
-    console.log('[MCP] Appel query:', sql);
-    const result = await this.executeQuery(sql);
-    console.log('[MCP] Résultat query:', result);
-    return result;
-  }
-
-  async getDocument(id: string): Promise<any> {
-    console.log('[MCP] Appel getDocument:', id);
-    const response = await lastValueFrom(
-      this.httpService.get(`${this.baseUrl}/documents/${id}`),
+    const preview = JSON.stringify(response.data);
+    console.log(
+      '[MCP] Résultat getSchema (extrait) :',
+      preview.slice(0, 300),
+      '...',
     );
-    console.log('[MCP] Résultat getDocument:', response.data);
     return response.data;
   }
 }
