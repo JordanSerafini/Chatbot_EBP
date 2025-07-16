@@ -2,7 +2,8 @@
   "mcpServers": {
     "ebp-postgres": {
       "command": "node",
-      "args": ["/home/tinkerbell/Bureau/Code/Solution_Logique/EBP/Backend_EBP/mcp-postgres-server/dist/index.js"],
+      "args": ["C:/Users/j.serafini/Desktop/Jordan/Code/Chatbot_EBP/Backend/mcp-postgres-server/dist/index.js"],
+      // "args": ["/home/tinkerbell/Bureau/Code/Solution_Logique/EBP/Backend_EBP/mcp-postgres-server/dist/index.js"],
       "env": {
         "POSTGRES_HOST": "localhost",
         "POSTGRES_PORT": "5432",

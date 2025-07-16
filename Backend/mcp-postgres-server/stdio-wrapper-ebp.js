@@ -11,8 +11,8 @@ class HttpMcpWrapper {
   constructor() {
     this.server = new Server(
       {
-        name: 'ebp-postgres-sync',
-        version: '1.0.0',
+        name: process.env.MCP_SERVER_NAME || 'ebp-postgres-sync',
+        version: process.env.MCP_SERVER_VERSION || '1.0.0',
       },
       {
         capabilities: {
@@ -21,34 +21,49 @@ class HttpMcpWrapper {
       }
     );
 
-    this.httpBaseUrl = 'http://localhost:3000';
+    this.httpBaseUrl = process.env.HTTP_BASE_URL || 'http://localhost:3000';
     this.setupHandlers();
   }
 
   async makeHttpRequest(endpoint, options = {}) {
     const url = `${this.httpBaseUrl}${endpoint}`;
-    const response = await fetch(url, {
-      method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+    
+    try {
+      console.error(`🌐 Appel HTTP: ${options.method || 'GET'} ${url}`);
+      
+      const response = await fetch(url, {
+        method: options.method || 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        body: options.body ? JSON.stringify(options.body) : undefined,
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Erreur HTTP ${response.status}: ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.error(`✅ Réponse HTTP reçue pour ${endpoint}`);
+      return result;
+    } catch (error) {
+      console.error(`❌ Erreur lors de l'appel HTTP ${endpoint}:`, error.message);
+      throw error;
     }
-
-    return await response.json();
   }
 
   setupHandlers() {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       try {
+        console.error('📋 Demande de liste des outils...');
         const result = await this.makeHttpRequest('/api/tools');
+        console.error('✅ Liste des outils récupérée');
         return result;
       } catch (error) {
+        console.error('⚠️ Erreur lors de la récupération des outils, utilisation de la liste par défaut:', error.message);
         return {
           tools: [
             {
@@ -130,6 +145,8 @@ class HttpMcpWrapper {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+
+      console.error(`🔧 Appel de l'outil: ${name} avec args:`, JSON.stringify(args));
 
       try {
         let result;

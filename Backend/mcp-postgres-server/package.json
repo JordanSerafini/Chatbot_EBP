@@ -1,7 +1,7 @@
 {
-  "name": "technidalle-mcp-postgres-server",
+  "name": "mcp-postgres-server",
   "version": "1.0.0",
-  "description": "Serveur MCP pour la base de données postgres_sync de Technidalle",
+  "description": "Serveur MCP pour la base de données EBP",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,10 @@
     "start:http": "node dist/http-server.js",
     "dev": "tsc --watch & node --watch dist/index.js",
     "dev:http": "tsc --watch & node --watch dist/http-server.js",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test:http": "node test-http.js",
+    "test:stdio": "node test-stdio.js",
+    "diagnostic": "node diagnostic.js"
   },
   "keywords": [
     "mcp",
