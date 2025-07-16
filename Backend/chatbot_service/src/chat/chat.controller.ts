@@ -1,16 +1,17 @@
 import { Controller, Post, Body, Get } from '@nestjs/common';
-import { LangchainService } from '../langchain/langchain.service';
+import { OpenAIService } from '../openai.service';
 
 @Controller('ask')
 export class ChatController {
-  constructor(private readonly langchainService: LangchainService) {}
+  constructor(private readonly openaiService: OpenAIService) {}
 
   @Post()
   async ask(
     @Body('question') question: string,
     @Body('sessionId') sessionId?: string,
   ) {
-    const answer = await this.langchainService.ask(question, sessionId);
+    const answer = await this.openaiService.chatWithTools(question, sessionId);
+    console.log('CONTROLLER ANSWER:', answer);
     return { answer };
   }
 

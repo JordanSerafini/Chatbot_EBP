@@ -70,7 +70,10 @@
   </style>
 </head>
 <body>
-  <div class="header">Chatbot EBP</div>
+  <div class="header">
+    Chatbot EBP
+    <span id="status-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:10px;background:#FFA500;vertical-align:middle;"></span>
+  </div>
   <div class="chat-container" id="chat">
     <div class="bubble">Bonjour ! Comment puis-je vous aider ?</div>
   </div>
@@ -82,6 +85,30 @@
     const chat = document.getElementById('chat');
     const form = document.getElementById('form');
     const input = document.getElementById('input');
+    const statusDot = document.getElementById('status-dot');
+
+    function setStatus(color, title) {
+      statusDot.style.background = color;
+      statusDot.title = title;
+    }
+
+    function checkStatus() {
+      setStatus('#FFA500', 'Vérification...');
+      fetch('http://localhost:3001/ask', { method: 'GET' })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+          if (data && data.status === 'ok') {
+            setStatus('#4CAF50', 'Connecté au chatbot');
+          } else {
+            setStatus('#FF9800', 'Réponse inattendue du chatbot');
+          }
+        })
+        .catch(() => {
+          setStatus('#F44336', 'Erreur de connexion au chatbot');
+        });
+    }
+
+    checkStatus();
 
     form.addEventListener('submit', function(e) {
       e.preventDefault();
@@ -93,14 +120,29 @@
       chat.appendChild(userBubble);
       input.value = '';
       chat.scrollTop = chat.scrollHeight;
-      // Simuler une réponse du bot
-      setTimeout(() => {
-        const botBubble = document.createElement('div');
-        botBubble.className = 'bubble';
-        botBubble.textContent = 'Réponse automatique : ' + text;
-        chat.appendChild(botBubble);
-        chat.scrollTop = chat.scrollHeight;
-      }, 700);
+      // Appel réel à l'API du chatbot
+      fetch('http://localhost:3001/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text })
+      })
+        .then(response => response.json())
+        .then(data => {
+          const botBubble = document.createElement('div');
+          botBubble.className = 'bubble';
+          botBubble.textContent = data.answer || 'Erreur : pas de réponse du bot';
+          chat.appendChild(botBubble);
+          chat.scrollTop = chat.scrollHeight;
+          checkStatus();
+        })
+        .catch(() => {
+          const botBubble = document.createElement('div');
+          botBubble.className = 'bubble';
+          botBubble.textContent = 'Erreur de connexion au chatbot';
+          chat.appendChild(botBubble);
+          chat.scrollTop = chat.scrollHeight;
+          setStatus('#F44336', 'Erreur de connexion au chatbot');
+        });
     });
   </script>
 </body>

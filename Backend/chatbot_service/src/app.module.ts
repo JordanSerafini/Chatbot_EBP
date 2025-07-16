@@ -1,13 +1,13 @@
-import { Module, HttpModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { LangchainService } from './langchain/langchain.service';
+import { HttpModule } from '@nestjs/axios';
+import { OpenAIService } from './openai.service';
 import { MCPClientService } from './mcp/mcp-client.service';
 import { ChatController } from './chat/chat.controller';
-import { IntentDetectorService } from './chat/intent-detector.service';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), HttpModule],
   controllers: [ChatController],
-  providers: [LangchainService, MCPClientService, IntentDetectorService],
+  providers: [OpenAIService, MCPClientService],
 })
 export class AppModule {}

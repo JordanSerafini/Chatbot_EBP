@@ -19,6 +19,19 @@ services:
     networks:
       - ebp-network
 
+  chatbot-service:
+    build:
+      context: ./Backend/chatbot_service
+      dockerfile: Dockerfile
+    container_name: chatbot-service
+    ports:
+      - "3001:3001"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MCP_SERVER_URL=${MCP_SERVER_URL} 
+    networks:
+      - ebp-network
+
 volumes:
   postgres_sync_data:
 
