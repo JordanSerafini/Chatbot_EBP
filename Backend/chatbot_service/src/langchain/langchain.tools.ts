@@ -1,11 +1,17 @@
 import { DynamicTool } from 'langchain/tools';
-import { MCPClientService } from '../mcp/mcp-client.service';
+import type { Tool } from 'langchain/tools';
+import type { MCPClientService } from '../mcp/mcp-client.service';
 
-export function createLangchainTools(mcpClient: MCPClientService) {
+/**
+ * Génère la liste des outils LangChain reliés au MCP server.
+ * @param mcpClient Service métier (HTTP) pour accéder aux données
+ */
+export function createLangchainTools(mcpClient: MCPClientService): Tool[] {
   return [
     new DynamicTool({
       name: 'queryMCP',
-      description: 'Envoie une requête SQL ou structurée au serveur MCP et retourne le résultat.',
+      description:
+        'Envoie une requête SQL ou structurée au serveur MCP et retourne le résultat.',
       func: async (input: string): Promise<string> => {
         try {
           const res = await mcpClient.query(input);

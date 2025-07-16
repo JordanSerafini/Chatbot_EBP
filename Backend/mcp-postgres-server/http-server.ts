@@ -78,7 +78,7 @@ class McpHttpServer {
         protocolVersion: '2024-11-05',
         capabilities: {},
         clientInfo: {
-          name: 'technidalle-http-bridge',
+          name: 'ebp-http-bridge',
           version: '1.0.0'
         }
       });
@@ -136,7 +136,7 @@ class McpHttpServer {
         status: 'ok',
         timestamp: new Date().toISOString(),
         mcpProcess: this.mcpProcess ? 'running' : 'stopped',
-        database: 'postgres_demobtp'
+        database: 'ebp_dump'
       });
     });
 
@@ -387,7 +387,7 @@ class McpHttpServer {
         });
 
         const schema = {
-          database: 'postgres_demobtp',
+          database: 'ebp_dump',
           tables: []
         };
 
@@ -438,7 +438,7 @@ class McpHttpServer {
 
         res.json({
           status: 'connected',
-          database: 'postgres_demobtp',
+          database: 'ebp_dump',
           result: result
         });
       } catch (error: any) {

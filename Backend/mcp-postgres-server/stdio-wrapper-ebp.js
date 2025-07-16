@@ -11,7 +11,7 @@ class HttpMcpWrapper {
   constructor() {
     this.server = new Server(
       {
-        name: 'technidalle-postgres-sync',
+        name: 'ebp-postgres-sync',
         version: '1.0.0',
       },
       {
@@ -21,7 +21,7 @@ class HttpMcpWrapper {
       }
     );
 
-    this.httpBaseUrl = 'http://localhost:3000';
+    this.httpBaseUrl = 'http://localhost:3100';
     this.setupHandlers();
   }
 

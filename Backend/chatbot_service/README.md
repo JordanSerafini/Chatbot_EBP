@@ -97,3 +97,35 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+# Utilisation du Chatbot
+
+## Configuration
+
+Créer un fichier `.env` à la racine du dossier `chatbot_service` avec :
+
+```
+OPENAI_API_KEY=sk-...
+MCP_SERVER_URL=http://localhost:PORT
+```
+
+## Endpoint API
+
+POST `/ask`
+
+Body JSON :
+```
+{
+  "question": "Votre question ici",
+  "sessionId": "optionnel"
+}
+```
+
+Réponse :
+```
+{
+  "answer": "Réponse générée par le chatbot."
+}
+```
+
+GET `/ask` : healthcheck (retourne `{ status: 'ok' }`)

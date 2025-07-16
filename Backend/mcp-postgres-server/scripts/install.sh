@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Script d'installation automatique du serveur MCP PostgreSQL Technidalle
+# Script d'installation automatique du serveur MCP PostgreSQL EBP
 # Usage: ./scripts/install.sh
 
 set -e
 
-echo "🚀 Installation du serveur MCP PostgreSQL Technidalle"
+echo "🚀 Installation du serveur MCP PostgreSQL EBP"
 echo "=================================================="
 
 # Vérifier Node.js
@@ -66,7 +66,7 @@ echo "⚙️ Configuration pour Cursor..."
 cat > "$CURSOR_CONFIG_FILE" << EOF
 {
   "mcpServers": {
-    "technidalle-postgres-sync": {
+    "ebp-postgres-sync": {
       "command": "node",
       "args": ["$PROJECT_ROOT/mcp-postgres-server/dist/index.js"],
       "env": {
@@ -75,7 +75,7 @@ cat > "$CURSOR_CONFIG_FILE" << EOF
         "POSTGRES_SYNC_USER": "sync_user",
         "POSTGRES_SYNC_PASSWORD": "sync_password",
         "POSTGRES_SYNC_DATABASE": "sync_db",
-        "MCP_SERVER_NAME": "technidalle-postgres-sync",
+        "MCP_SERVER_NAME": "ebp-postgres-sync",
         "MCP_SERVER_VERSION": "1.0.0",
         "NODE_ENV": "development",
         "LOG_LEVEL": "info"

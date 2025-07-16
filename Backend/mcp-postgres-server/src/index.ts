@@ -22,7 +22,7 @@ interface DatabaseConfig {
   database: string;
 }
 
-class TechnidalleMCPServer {
+class EBPMCPServer {
   private server: Server;
   private pool!: Pool;
   private connected: boolean = false;
@@ -30,7 +30,7 @@ class TechnidalleMCPServer {
   constructor() {
     this.server = new Server(
       {
-        name: process.env.MCP_SERVER_NAME || 'technidalle-postgres',
+        name: process.env.MCP_SERVER_NAME || 'ebp-postgres',
         version: process.env.MCP_SERVER_VERSION || '1.0.0',
       },
       {
@@ -51,7 +51,7 @@ class TechnidalleMCPServer {
       port: parseInt(process.env.POSTGRES_PORT || '5432'),
       user: process.env.POSTGRES_USER || 'postgres',
       password: process.env.POSTGRES_PASSWORD || 'postgres',
-      database: process.env.POSTGRES_DATABASE || 'sync_db',
+      database: process.env.POSTGRES_DATABASE || 'ebp_dump',
     };
   }
 
@@ -85,8 +85,8 @@ class TechnidalleMCPServer {
   }
 
   private setupHandlers(): void {
-    const toolSuffix = process.env.MCP_TOOL_SUFFIX || '_sync';
-    const dbName = process.env.POSTGRES_DATABASE || 'sync_db';
+    const toolSuffix = process.env.MCP_TOOL_SUFFIX || '';
+    const dbName = process.env.POSTGRES_DATABASE || 'ebp_dump';
 
     // Handler pour lister les outils disponibles
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -443,7 +443,7 @@ class TechnidalleMCPServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     
-    console.log('🚀 Serveur MCP Technidalle PostgreSQL démarré');
+    console.log('🚀 Serveur MCP EBP PostgreSQL démarré');
     console.log('📊 État de la connexion:');
     console.log(`  - postgres_demobtp: ${this.connected ? '✅ connecté' : '❌ déconnecté'}`);
   }
@@ -457,7 +457,7 @@ class TechnidalleMCPServer {
 
 // Point d'entrée principal
 async function main() {
-  const server = new TechnidalleMCPServer();
+  const server = new EBPMCPServer();
   
   // Gestion propre de l'arrêt
   process.on('SIGINT', async () => {

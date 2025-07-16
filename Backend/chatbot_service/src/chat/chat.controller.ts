@@ -1,5 +1,5 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { LangchainService } from './langchain.service';
+import { Controller, Post, Body, Get } from '@nestjs/common';
+import { LangchainService } from '../langchain/langchain.service';
 
 @Controller('ask')
 export class ChatController {
@@ -12,5 +12,10 @@ export class ChatController {
   ) {
     const answer = await this.langchainService.ask(question, sessionId);
     return { answer };
+  }
+
+  @Get()
+  getHello() {
+    return { status: 'ok' };
   }
 }
