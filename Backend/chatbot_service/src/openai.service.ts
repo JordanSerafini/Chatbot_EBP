@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MCPClientService } from './mcp/mcp-client.service';
 import axios from 'axios';
+import { AnswerFormatterService } from './answer-formatter.service';
 
 @Injectable()
 export class OpenAIService {
@@ -12,6 +13,7 @@ export class OpenAIService {
   constructor(
     private readonly configService: ConfigService,
     private readonly mcpClient: MCPClientService,
+    private readonly answerFormatter: AnswerFormatterService,
   ) {
     const key = this.configService.get<string>('OPENAI_API_KEY');
     if (!key) throw new Error('OPENAI_API_KEY manquant');
@@ -150,29 +152,9 @@ export class OpenAIService {
           break;
         }
       }
-      // Si aucune réponse textuelle, on retourne les données brutes MCP formatées
-      if (!lastResponse && lastFunctionResult) {
-        // On tente d'afficher joliment les données SQL si présentes
-        if (lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
-          if (lastFunctionResult.data.length === 0) {
-            return 'Aucune donnée trouvée.';
-          }
-          // On affiche les 5 premières lignes max
-          const preview = lastFunctionResult.data.slice(0, 5);
-          const columns = Object.keys(preview[0]);
-          const header = columns.join(' | ');
-          const rows = preview.map(row => columns.map(col => String(row[col])).join(' | '));
-          return [
-            'Voici un aperçu des résultats :',
-            '```' + header,
-            ...rows,
-            '```',
-            preview.length < lastFunctionResult.data.length ? `... (${lastFunctionResult.data.length} lignes au total)` : ''
-          ].filter(Boolean).join('\n');
-        } else {
-          // Sinon, on retourne le JSON brut
-          return 'Résultat brut :\n' + JSON.stringify(lastFunctionResult, null, 2);
-        }
+      // Si aucune réponse textuelle, on utilise le AnswerFormatterService pour formater la réponse à partir des données SQL
+      if (!lastResponse && lastFunctionResult && lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
+        return this.answerFormatter.formatAnswer(question, lastFunctionResult.data);
       }
       return lastResponse || 'Aucune réponse générée.';
     } catch (error: any) {
