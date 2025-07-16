@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Robot</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    #robot {
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-drag: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    img {
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      -webkit-user-drag: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="robot">
+    <img src="./utils/assets/robot.png" alt="robot" draggable="false" />
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    document.getElementById('robot').addEventListener('click', () => {
+      ipcRenderer.send('open-chat');
+    });
+  </script>
+</body>
+</html> 

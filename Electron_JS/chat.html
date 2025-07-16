@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Chatbot</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ece5dd;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: #075e54;
+      color: #fff;
+      padding: 16px;
+      font-size: 1.2em;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+    .chat-container {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow-y: auto;
+    }
+    .bubble {
+      max-width: 70%;
+      margin-bottom: 10px;
+      padding: 10px 16px;
+      border-radius: 18px;
+      background: #fff;
+      align-self: flex-start;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .bubble.user {
+      background: #dcf8c6;
+      align-self: flex-end;
+    }
+    .input-container {
+      display: flex;
+      padding: 12px;
+      background: #f7f7f7;
+      border-top: 1px solid #ddd;
+    }
+    .input-container input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      outline: none;
+      font-size: 1em;
+    }
+    .input-container button {
+      margin-left: 8px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 20px;
+      background: #075e54;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">Chatbot EBP</div>
+  <div class="chat-container" id="chat">
+    <div class="bubble">Bonjour ! Comment puis-je vous aider ?</div>
+  </div>
+  <form class="input-container" id="form">
+    <input type="text" id="input" placeholder="Écrivez un message..." autocomplete="off" />
+    <button type="submit">Envoyer</button>
+  </form>
+  <script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      const userBubble = document.createElement('div');
+      userBubble.className = 'bubble user';
+      userBubble.textContent = text;
+      chat.appendChild(userBubble);
+      input.value = '';
+      chat.scrollTop = chat.scrollHeight;
+      // Simuler une réponse du bot
+      setTimeout(() => {
+        const botBubble = document.createElement('div');
+        botBubble.className = 'bubble';
+        botBubble.textContent = 'Réponse automatique : ' + text;
+        chat.appendChild(botBubble);
+        chat.scrollTop = chat.scrollHeight;
+      }, 700);
+    });
+  </script>
+</body>
+</html> 
