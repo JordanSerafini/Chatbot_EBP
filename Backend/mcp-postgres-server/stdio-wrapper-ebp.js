@@ -21,7 +21,7 @@ class HttpMcpWrapper {
       }
     );
 
-    this.httpBaseUrl = 'http://localhost:3100';
+    this.httpBaseUrl = 'http://localhost:3000';
     this.setupHandlers();
   }
 

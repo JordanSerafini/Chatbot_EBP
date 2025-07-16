@@ -105,7 +105,7 @@ export class OpenAIService {
         const response = await axios.post(
           this.openAIUrl,
           {
-            model: 'gpt-4o',
+            model: 'gpt-4o-mini',
             messages,
             functions: this.getFunctions(),
             function_call: 'auto',
