@@ -2,7 +2,6 @@
 .cursor
 node_modules
 dist
-.cursor
 .env
 .env.local
 .env.development.local

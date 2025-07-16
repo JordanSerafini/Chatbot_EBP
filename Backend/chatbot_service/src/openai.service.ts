@@ -82,17 +82,23 @@ export class OpenAIService {
 
   // Fonction principale : dialogue avec OpenAI + MCP tools
   async chatWithTools(question: string, sessionId?: string): Promise<string> {
-    const messages = [
+    const systemPrompt =
+      `Tu es un assistant connecté à une base de données métier. Utilise les fonctions MCP pour répondre aux questions en interrogeant la base si besoin. Quand tu génères une requête SQL :\n` +
+      `- Utilise exactement les noms de colonnes et de tables tels qu’ils apparaissent dans la base (respecte la casse).\n` +
+      `- Entoure systématiquement les noms de colonnes et de tables de guillemets doubles.\n` +
+      `- Ajoute toujours une clause LIMIT avec un nombre (ex : LIMIT 10) sauf pour les agrégats (SUM, COUNT...).`;
+
+    let messages = [
       {
         role: 'system',
-        content:
-          'Tu es un assistant connecté à une base de données métier. Utilise les fonctions MCP pour répondre aux questions en interrogeant la base si besoin. Quand tu génères une requête SQL, assure-toi que la clause LIMIT est toujours suivie d’un nombre (ex : LIMIT 10) et que la requête est compatible PostgreSQL.',
+        content: systemPrompt,
       },
       { role: 'user', content: question },
     ];
     let loopCount = 0;
     let lastResponse: any = null;
     let lastFunctionResult: any = null; // Pour stocker le dernier résultat MCP
+    let lastTriedTable: string | null = null;
     try {
       while (loopCount < 3) {
         loopCount++;
@@ -123,6 +129,7 @@ export class OpenAIService {
             this.logger.error('Erreur parsing arguments function_call:', argsStr);
           }
           let result: any = null;
+          try {
           if (name === 'queryMCP') {
             result = await this.mcpClient.executeQuery(
               args.query,
@@ -140,13 +147,38 @@ export class OpenAIService {
           } else if (name === 'getSchemaMCP') {
             result = await this.mcpClient.getSchema();
           }
-          lastFunctionResult = result; // On stocke le dernier résultat MCP
+            lastFunctionResult = result; // On stocke le dernier résultat MCP
           messages.push({
             role: 'function',
             name,
             content: JSON.stringify(result),
           } as any);
           continue; // relance la boucle pour obtenir la réponse finale
+          } catch (err: any) {
+            // Fallback automatique si colonne n'existe pas
+            const errMsg = String(err?.message || '').toLowerCase();
+            const tableMatch = args.query?.match(/from\s+"?([a-zA-Z0-9_]+)"?/i);
+            if (errMsg.includes('colonne') && errMsg.includes('existe pas') && tableMatch) {
+              const tableName = tableMatch[1];
+              if (lastTriedTable === tableName) {
+                // On a déjà tenté le fallback sur cette table, on arrête pour éviter la boucle
+                throw err;
+              }
+              lastTriedTable = tableName;
+              // On récupère la description de la table
+              const desc = await this.mcpClient.describeTable(tableName);
+              if (desc && Array.isArray(desc) && desc.length > 0) {
+                const colList = desc.map((col: any) => `- "${col.column_name}" (${col.data_type})`).join('\n');
+                // On reformule la question à l'agent avec la liste des colonnes réelles
+                messages.push({
+                  role: 'system',
+                  content: `Voici la liste exacte des colonnes de la table "${tableName}" :\n${colList}\nUtilise ces noms de colonnes pour générer la requête SQL.`,
+                });
+                continue; // relance la boucle avec la nouvelle consigne
+              }
+            }
+            throw err;
+          }
         } else if (msg.content) {
           lastResponse = msg.content;
           break;
