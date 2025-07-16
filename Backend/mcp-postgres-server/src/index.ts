@@ -98,7 +98,6 @@ class EBPMCPServer {
   }
 
   private setupHandlers(): void {
-    const toolSuffix = process.env.MCP_TOOL_SUFFIX || '';
     const dbName = process.env.POSTGRES_DATABASE || 'ebp_dump';
 
     // Handler pour lister les outils disponibles
@@ -106,7 +105,7 @@ class EBPMCPServer {
       return {
         tools: [
           {
-            name: `execute_query${toolSuffix}`,
+            name: 'execute_query',
             description: `Exécuter une requête SQL en lecture seule sur la base ${dbName}`,
             inputSchema: {
               type: 'object',
@@ -125,7 +124,7 @@ class EBPMCPServer {
             },
           },
           {
-            name: `list_tables${toolSuffix}`,
+            name: 'list_tables',
             description: `Lister toutes les tables disponibles dans ${dbName}`,
             inputSchema: {
               type: 'object',
@@ -140,7 +139,7 @@ class EBPMCPServer {
             },
           },
           {
-            name: `describe_table${toolSuffix}`,
+            name: 'describe_table',
             description: `Obtenir la structure détaillée d'une table dans ${dbName}`,
             inputSchema: {
               type: 'object',
@@ -159,7 +158,7 @@ class EBPMCPServer {
             },
           },
           {
-            name: `analyze_data${toolSuffix}`,
+            name: 'analyze_data',
             description: `Analyser les données d'une table dans ${dbName} (comptages, statistiques)`,
             inputSchema: {
               type: 'object',
@@ -279,16 +278,14 @@ class EBPMCPServer {
         throw new Error('Arguments manquants');
       }
 
-      const toolSuffix = process.env.MCP_TOOL_SUFFIX || '_sync';
-
       switch (name) {
-        case `execute_query${toolSuffix}`:
+        case 'execute_query':
           return await this.executeQuery(args.query as string, (args.limit as number) || 100);
-        case `list_tables${toolSuffix}`:
+        case 'list_tables':
           return await this.listTables((args.schema as string) || 'public');
-        case `describe_table${toolSuffix}`:
+        case 'describe_table':
           return await this.describeTable(args.table_name as string, (args.schema as string) || 'public');
-        case `analyze_data${toolSuffix}`:
+        case 'analyze_data':
           return await this.analyzeData(args.table_name as string, args.columns as string[] || []);
         default:
           throw new Error(`Outil inconnu: ${name}`);

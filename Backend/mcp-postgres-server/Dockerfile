@@ -19,12 +19,12 @@ RUN npm ci
 
 # Copier le code source
 COPY src/ ./src/
-COPY http-server.ts ./
 
 # Compiler le TypeScript
 RUN npm run build
+RUN cp src/stdio-wrapper-ebp.js dist/stdio-wrapper-ebp.js
 # Compiler également le serveur HTTP
-RUN npx tsc http-server.ts --outDir dist --target ES2022 --module ESNext --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck
+RUN npx tsc src/http-server.ts --outDir dist --target ES2022 --module ESNext --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck
 
 # Supprimer les devDependencies après compilation
 RUN npm ci --only=production --legacy-peer-deps && npm cache clean --force

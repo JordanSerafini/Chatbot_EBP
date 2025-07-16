@@ -67,7 +67,7 @@ class HttpMcpWrapper {
         return {
           tools: [
             {
-              name: 'execute_query_sync',
+              name: 'execute_query',
               description: 'Exécuter une requête SQL en lecture seule sur la base sync_db',
               inputSchema: {
                 type: 'object',
@@ -86,7 +86,7 @@ class HttpMcpWrapper {
               },
             },
             {
-              name: 'list_tables_sync',
+              name: 'list_tables',
               description: 'Lister toutes les tables disponibles dans sync_db',
               inputSchema: {
                 type: 'object',
@@ -101,7 +101,7 @@ class HttpMcpWrapper {
               },
             },
             {
-              name: 'describe_table_sync',
+              name: 'describe_table',
               description: 'Obtenir la structure détaillée d\'une table dans sync_db',
               inputSchema: {
                 type: 'object',
@@ -120,7 +120,7 @@ class HttpMcpWrapper {
               },
             },
             {
-              name: 'analyze_data_sync',
+              name: 'analyze_data',
               description: 'Analyser les données d\'une table dans sync_db (comptages, statistiques)',
               inputSchema: {
                 type: 'object',
@@ -152,7 +152,7 @@ class HttpMcpWrapper {
         let result;
         
         switch (name) {
-          case 'execute_query_sync':
+          case 'execute_query':
             result = await this.makeHttpRequest('/api/query', {
               method: 'POST',
               body: {
@@ -162,15 +162,15 @@ class HttpMcpWrapper {
             });
             break;
 
-          case 'list_tables_sync':
+          case 'list_tables':
             result = await this.makeHttpRequest(`/api/tables?schema=${args.schema || 'public'}`);
             break;
 
-          case 'describe_table_sync':
+          case 'describe_table':
             result = await this.makeHttpRequest(`/api/tables/${args.table_name}?schema=${args.schema || 'public'}`);
             break;
 
-          case 'analyze_data_sync':
+          case 'analyze_data':
             result = await this.makeHttpRequest(`/api/analyze/${args.table_name}`, {
               method: 'POST',
               body: {

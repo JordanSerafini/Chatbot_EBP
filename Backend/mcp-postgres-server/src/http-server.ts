@@ -205,7 +205,7 @@ class McpHttpServer {
         const { schema = 'public' } = req.query;
 
         const result = await this.sendMcpRequest('tools/call', {
-          name: `list_tables${toolSuffix}`,
+          name: 'list_tables',
           arguments: { schema }
         });
 
@@ -247,7 +247,7 @@ class McpHttpServer {
         const { schema = 'public' } = req.query;
 
         const result = await this.sendMcpRequest('tools/call', {
-          name: `describe_table${toolSuffix}`,
+          name: 'describe_table',
           arguments: { table_name: tableName, schema }
         });
 
@@ -322,7 +322,7 @@ class McpHttpServer {
         }
 
         const result = await this.sendMcpRequest('tools/call', {
-          name: `execute_query${toolSuffix}`,
+          name: 'execute_query',
           arguments: { query, limit }
         });
 
@@ -380,7 +380,7 @@ class McpHttpServer {
         const { columns } = req.body;
 
         const result = await this.sendMcpRequest('tools/call', {
-          name: `analyze_data${toolSuffix}`,
+          name: 'analyze_data',
           arguments: { table_name: tableName, columns }
         });
 
@@ -395,7 +395,7 @@ class McpHttpServer {
       try {
         // Récupérer la liste des tables
         const tablesResult = await this.sendMcpRequest('tools/call', {
-          name: `list_tables${toolSuffix}`,
+          name: 'list_tables',
           arguments: { schema: 'public' }
         });
 
@@ -414,7 +414,7 @@ class McpHttpServer {
               const tableName = match[1];
               try {
                 const description = await this.sendMcpRequest('tools/call', {
-                  name: `describe_table${toolSuffix}`,
+                  name: 'describe_table',
                   arguments: { table_name: tableName, schema: 'public' }
                 });
                 
@@ -442,7 +442,7 @@ class McpHttpServer {
     this.app.get('/api/status', async (req: Request, res: Response) => {
       try {
         const result = await this.sendMcpRequest('tools/call', {
-          name: `execute_query${toolSuffix}`,
+          name: 'execute_query',
           arguments: { 
             query: 'SELECT version() as version, current_database() as database, current_user as user',
             limit: 1 
