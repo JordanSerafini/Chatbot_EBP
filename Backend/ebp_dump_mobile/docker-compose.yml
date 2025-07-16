@@ -1,0 +1,25 @@
+services:
+  postgres_app:
+    image: postgres:13
+    container_name: postgres_app_db
+    environment:
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+      POSTGRES_DB: ${PG_DATABASE:-postgres}
+    ports:
+      - '${PG_PORT:-5432}:5432'
+    volumes:
+      - postgres_app_data:/var/lib/postgresql/data
+
+  pg_dump:
+    image: postgres:13
+    depends_on:
+      - postgres_app
+    entrypoint: [ "sh", "-c", "pg_dump -h postgres_app -U postgres -d postgres > /dump/dump.sql" ]
+    environment:
+      PGPASSWORD: postgres
+    volumes:
+      - ./dump:/dump
+
+volumes:
+  postgres_app_data:

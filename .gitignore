@@ -1,0 +1,11 @@
+.env
+.cursor
+node_modules
+dist
+.cursor
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+sli.sql
