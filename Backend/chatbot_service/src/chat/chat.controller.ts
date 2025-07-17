@@ -11,6 +11,10 @@ import {
 import { OpenAIService } from '../openai.service';
 import { SessionService } from '../session.service';
 import { SecurityService } from '../security.service';
+import {
+  AnswerFormatterService,
+  FormattedResponse,
+} from '../answer-formatter.service';
 
 interface AskRequest {
   question: string;
@@ -22,6 +26,7 @@ interface AskRequest {
 interface AskResponse {
   answer: string;
   sessionId: string;
+  formattedResponse?: FormattedResponse;
   pagination?: {
     page: number;
     limit: number;
@@ -37,6 +42,7 @@ export class ChatController {
     private readonly openaiService: OpenAIService,
     private readonly sessionService: SessionService,
     private readonly securityService: SecurityService,
+    private readonly answerFormatter: AnswerFormatterService,
   ) {}
 
   @Post()
@@ -96,9 +102,38 @@ export class ChatController {
         answerLength: answer.length,
       });
 
+      // Essayer de formater la réponse si c'est une requête de données
+      let formattedResponse: FormattedResponse | undefined;
+      try {
+        // Vérifier si la réponse contient des données JSON (cas où OpenAI a utilisé un outil)
+        const sessionMessages = await this.sessionService.getSession(sessionIdFinal);
+        const lastFunctionMessage = sessionMessages
+          .filter((msg) => msg.role === 'function')
+          .pop();
+
+        if (lastFunctionMessage && lastFunctionMessage.content) {
+          const functionResult = JSON.parse(lastFunctionMessage.content) as any;
+          if (
+            functionResult.data &&
+            Array.isArray(functionResult.data) &&
+            functionResult.data.length > 0
+          ) {
+            formattedResponse = this.answerFormatter.formatAnswer(
+              question,
+              functionResult.data,
+            );
+          }
+        }
+      } catch (formatError) {
+        this.logger.warn('Erreur lors du formatage de la réponse', {
+          error: formatError,
+        });
+      }
+
       const response = {
         answer,
         sessionId: sessionIdFinal,
+        formattedResponse,
         pagination: {
           page: paginationValidation.sanitized!.page,
           limit: paginationValidation.sanitized!.limit,

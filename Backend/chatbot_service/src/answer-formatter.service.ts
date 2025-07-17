@@ -1,90 +1,228 @@
 import { Injectable } from '@nestjs/common';
 import { stringify } from 'csv-stringify/sync';
 
+export interface FormattedResponse {
+  type: 'liste' | 'detail' | 'statistique' | 'recherche' | 'erreur';
+  message: string;
+  data?: any[];
+  metadata?: {
+    rowCount: number;
+    columnCount: number;
+    preview?: any[];
+  };
+}
+
 @Injectable()
 export class AnswerFormatterService {
   // Vérifie si les données sont pertinentes pour la question
   checkDataRelevance(question: string, data: any[]): boolean {
-    // Simple : si data est vide, ce n'est pas pertinent
     if (!Array.isArray(data) || data.length === 0) {
       return false;
     }
-    // On pourrait ajouter ici des règles plus avancées (NLP, mots-clés, etc.)
     return true;
   }
 
-  // Ajoute un résumé métier en début de réponse et propose export si volumineux
-  formatAnswer(question: string, data: any[]): string {
-    if (!this.checkDataRelevance(question, data)) {
-      return "Je n'ai pas trouvé de données pertinentes pour répondre à votre question.";
-    }
-
+  // Détecte le type de réponse basé sur la question et les données
+  detectResponseType(
+    question: string,
+    data: any[],
+  ): 'liste' | 'detail' | 'statistique' | 'recherche' {
     const lowerQ = question.toLowerCase();
-    let type = 'liste';
+
+    // Statistiques et agrégations
     if (
-      /moyenne|médiane|total|somme|sum|count|nombre|statistique|moyen|maximum|minim|écart|répartition/.test(
+      /moyenne|médiane|total|somme|sum|count|nombre|statistique|moyen|maximum|minim|écart|répartition|cumulé/.test(
         lowerQ,
       )
     ) {
-      type = 'statistique';
-    } else if (
-      /recherche|trouve|trouver|quel|quelle|qui|où|whose|find|search/.test(
+      return 'statistique';
+    }
+
+    // Recherches spécifiques
+    if (
+      /recherche|trouve|trouver|quel|quelle|qui|où|whose|find|search|montre-moi|donne-moi/.test(
         lowerQ,
       )
     ) {
-      type = 'recherche';
+      return 'recherche';
     }
 
-    const preview = data.slice(0, 5);
-    const columns = Object.keys(preview[0]);
-
-    // Résumé métier
-    let summary = `**Résumé métier :**\n- Résultat : ${data.length} ligne(s), ${columns.length} colonne(s).`;
-    if (data.length > 50) {
-      summary += '\n- Résultat volumineux : export CSV conseillé.';
-    }
-    summary +=
-      '\n- Conseil : Filtrez, triez ou demandez une statistique pour affiner.';
-
-    // Exemples si question floue
+    // Détail d'un élément spécifique
     if (
-      lowerQ.length < 10 ||
-      /quoi|comment|aide|exemple|help|\?\s*$/.test(lowerQ)
+      data.length === 1 ||
+      /détail|fiche|information sur|données de/.test(lowerQ)
     ) {
-      summary +=
-        '\n- Exemple : "Montre-moi les 10 dernières ventes", "Quel est le total des factures par client ?"';
+      return 'detail';
     }
 
-    // Tableau markdown
-    const header = columns.join(' | ');
-    const separator = columns.map(() => '---').join(' | ');
-    const rows = preview.map((row) =>
-      columns.map((col) => String(row[col])).join(' | '),
-    );
-    const table = ['```markdown', header, separator, ...rows, '```'].join('\n');
+    // Par défaut : liste
+    return 'liste';
+  }
 
-    // Propose export CSV si volumineux
-    let exportMsg = '';
-    if (data.length > 50) {
-      exportMsg = '\n[Export CSV disponible]\n';
+  // Formate une réponse selon son type
+  formatAnswer(question: string, data: any[]): FormattedResponse {
+    if (!this.checkDataRelevance(question, data)) {
+      return {
+        type: 'erreur',
+        message:
+          "Je n'ai pas trouvé de données pertinentes pour répondre à votre question.",
+      };
     }
 
-    // Suggestion de graphique si pertinent (ex: 2 colonnes numériques)
-    let chartMsg = '';
-    if (
-      data.length > 50 &&
-      columns.length === 2 &&
-      data.every(
-        (row) =>
-          typeof row[columns[0]] === 'number' &&
-          typeof row[columns[1]] === 'number',
-      )
-    ) {
-      chartMsg =
-        '\n💡 **Suggestion :** Ces données seraient parfaites pour un graphique en barres ou un nuage de points.\n';
+    const responseType = this.detectResponseType(question, data);
+    const columns = Object.keys(data[0] || {});
+
+    switch (responseType) {
+      case 'statistique':
+        return this.formatStatistique(question, data, columns);
+      case 'detail':
+        return this.formatDetail(question, data, columns);
+      case 'recherche':
+        return this.formatRecherche(question, data, columns);
+      case 'liste':
+      default:
+        return this.formatListe(question, data, columns);
+    }
+  }
+
+  // Formate une réponse de type statistique
+  private formatStatistique(
+    question: string,
+    data: any[],
+    columns: string[],
+  ): FormattedResponse {
+    const firstRow = data[0] as Record<string, unknown>;
+    const values = Object.values(firstRow);
+
+    // Si c'est une seule valeur (ex: total, moyenne)
+    if (data.length === 1 && columns.length === 1) {
+      const value = values[0];
+      const columnName = columns[0];
+
+      // Formater selon le type de valeur
+      let formattedValue = value;
+      if (typeof value === 'number') {
+        formattedValue = new Intl.NumberFormat('fr-FR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(value);
+      }
+
+      return {
+        type: 'statistique',
+        message: `Le ${columnName} est de ${String(formattedValue)}.`,
+        data,
+        metadata: {
+          rowCount: data.length,
+          columnCount: columns.length,
+        },
+      };
     }
 
-    return [summary, exportMsg, chartMsg, table].filter(Boolean).join('\n');
+    // Si c'est un tableau de statistiques
+    const preview = data.slice(0, 3);
+    const message = `Voici les statistiques demandées (${data.length} résultat${
+      data.length > 1 ? 's' : ''
+    }) :`;
+
+    return {
+      type: 'statistique',
+      message,
+      data,
+      metadata: {
+        rowCount: data.length,
+        columnCount: columns.length,
+        preview,
+      },
+    };
+  }
+
+  // Formate une réponse de type détail
+  private formatDetail(
+    question: string,
+    data: any[],
+    columns: string[],
+  ): FormattedResponse {
+    const item = data[0] as Record<string, unknown>;
+    const details = columns
+      .map((col) => `${col}: ${String(item[col])}`)
+      .join(', ');
+
+    return {
+      type: 'detail',
+      message: `Voici les détails : ${details}`,
+      data,
+      metadata: {
+        rowCount: data.length,
+        columnCount: columns.length,
+      },
+    };
+  }
+
+  // Formate une réponse de type recherche
+  private formatRecherche(
+    question: string,
+    data: any[],
+    columns: string[],
+  ): FormattedResponse {
+    const count = data.length;
+    let message = '';
+
+    if (count === 0) {
+      message = 'Aucun résultat trouvé pour votre recherche.';
+    } else if (count === 1) {
+      message = "J'ai trouvé 1 résultat :";
+    } else if (count <= 10) {
+      message = `J'ai trouvé ${count} résultats :`;
+    } else {
+      message = `J'ai trouvé ${count} résultats (affichage des 10 premiers) :`;
+    }
+
+    const preview = data.slice(0, 10);
+
+    return {
+      type: 'recherche',
+      message,
+      data,
+      metadata: {
+        rowCount: data.length,
+        columnCount: columns.length,
+        preview,
+      },
+    };
+  }
+
+  // Formate une réponse de type liste
+  private formatListe(
+    question: string,
+    data: any[],
+    columns: string[],
+  ): FormattedResponse {
+    const count = data.length;
+    let message = '';
+
+    if (count === 0) {
+      message = 'La liste est vide.';
+    } else if (count === 1) {
+      message = "Voici l'élément demandé :";
+    } else if (count <= 20) {
+      message = `Voici la liste (${count} élément${count > 1 ? 's' : ''}) :`;
+    } else {
+      message = `Voici la liste (${count} éléments, affichage des 20 premiers) :`;
+    }
+
+    const preview = data.slice(0, 20);
+
+    return {
+      type: 'liste',
+      message,
+      data,
+      metadata: {
+        rowCount: data.length,
+        columnCount: columns.length,
+        preview,
+      },
+    };
   }
 
   // Export CSV

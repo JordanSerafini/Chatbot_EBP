@@ -21,6 +21,19 @@ CONVENTIONS SQL :
 - Colonnes : "NomColonne" (PascalCase)
 - Exemple : SELECT "Nom", "Prenom" FROM "Client" LIMIT 10
 
+UTILISATION DES OUTILS MCP (OBLIGATOIRE) :
+- AVANT toute requête SQL, utilise listTablesMCP pour voir les tables disponibles
+- Puis utilise describeTableMCP pour chaque table pertinente à la question
+- Décris toujours la structure des tables avant d'exécuter des requêtes
+- Utilise getSchemaMCP si tu as besoin d'une vue d'ensemble complète
+
+PROCESSUS D'ANALYSE :
+1. Liste les tables disponibles avec listTablesMCP
+2. Identifie les tables pertinentes pour la question
+3. Décris la structure de chaque table pertinente avec describeTableMCP
+4. Formule une requête SQL appropriée basée sur la structure réelle
+5. Exécute la requête avec queryMCP
+
 FONCTIONNALITÉS :
 - Analyse automatique des données avec statistiques
 - Suggestions de filtres et tri pour affiner les résultats
@@ -34,6 +47,7 @@ CONTEXTE MÉTIER :
 
 FORMAT DE RÉPONSE :
 - Résumé métier en début de réponse
+- Description des tables utilisées
 - Tableau markdown lisible (max 10 lignes)
 - Suggestions d'exploration si pertinent
 - Propositions d'export/graphique si volumineux`;

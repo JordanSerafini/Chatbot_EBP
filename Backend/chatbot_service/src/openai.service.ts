@@ -35,8 +35,15 @@ export class OpenAIService {
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'La requête SQL SELECT à exécuter' },
-            limit: { type: 'integer', description: 'Limite de résultats', default: 100 },
+            query: {
+              type: 'string',
+              description: 'La requête SQL SELECT à exécuter',
+            },
+            limit: {
+              type: 'integer',
+              description: 'Limite de résultats',
+              default: 100,
+            },
           },
           required: ['query'],
         },
@@ -85,10 +92,12 @@ export class OpenAIService {
   private extractTableNames(sql: string): string[] {
     const regex = /\b(?:FROM|JOIN|INTO|UPDATE)\s+"?([A-Za-z0-9_]+)"?/gi;
     const tables = new Set<string>();
-    let match;
+    let match: RegExpExecArray | null;
+
     while ((match = regex.exec(sql))) {
       tables.add(match[1]);
     }
+
     return Array.from(tables);
   }
 
@@ -124,9 +133,12 @@ export class OpenAIService {
 
       while (loopCount < 3) {
         loopCount++;
-        
-        this.logger.log(`Itération ${loopCount} pour la session ${sessionIdFinal}`, { sessionId: sessionIdFinal });
-        
+
+        this.logger.log(
+          `Itération ${loopCount} pour la session ${sessionIdFinal}`,
+          { sessionId: sessionIdFinal },
+        );
+
         const response = await axios.post(
           this.openAIUrl,
           {
@@ -143,8 +155,8 @@ export class OpenAIService {
           },
         );
 
-        const choice = response.data.choices[0];
-        const msg = choice.message;
+        const choice = response.data.choices[0] as any;
+        const msg = choice.message as any;
 
         if (msg.function_call) {
           // Appel d'un tool MCP demandé par OpenAI
@@ -269,11 +281,11 @@ export class OpenAIService {
         
         await this.sessionService.saveMessage(sessionIdFinal, {
           role: 'assistant',
-          content: formattedResponse,
+          content: formattedResponse.message,
           timestamp: new Date().toISOString(),
         });
         
-        return formattedResponse;
+        return formattedResponse.message;
       }
 
       return lastResponse || 'Aucune réponse générée.';
