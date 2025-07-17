@@ -191,6 +191,17 @@ export class OpenAIService {
               result = await this.mcpClient.getSchema();
             }
 
+            // Vérifier si le résultat contient une erreur
+            if (result && result.error) {
+              this.logger.warn(`Erreur MCP détectée pour ${name}:`, result.message);
+              // Continuer avec un message d'erreur informatif plutôt que de faire échouer
+              result = {
+                success: false,
+                message: result.message,
+                data: []
+              };
+            }
+
             lastFunctionResult = result;
             
             // Sauvegarder le résultat de la fonction

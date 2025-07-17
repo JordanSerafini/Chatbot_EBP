@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, Query, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Query,
+  Logger,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { OpenAIService } from '../openai.service';
 import { SessionService } from '../session.service';
 import { SecurityService } from '../security.service';
@@ -33,38 +42,103 @@ export class ChatController {
   @Post()
   async ask(@Body() body: AskRequest): Promise<AskResponse> {
     const { question, sessionId, page = 1, limit = 10 } = body;
-    
+
+    this.logger.log(`=== DÉBUT REQUÊTE ===`, {
+      question:
+        question?.substring(0, 50) + (question?.length > 50 ? '...' : ''),
+      sessionId,
+      page,
+      limit,
+      userAgent: 'Frontend/Electron',
+    });
+
     // Validation de la pagination
-    const paginationValidation = this.securityService.validatePagination(page, limit);
+    const paginationValidation = this.securityService.validatePagination(
+      page,
+      limit,
+    );
     if (!paginationValidation.isValid) {
-      throw new Error(paginationValidation.error);
+      this.logger.error(`Erreur validation pagination`, {
+        error: paginationValidation.error,
+      });
+      throw new HttpException(
+        paginationValidation.error || 'Erreur de validation de pagination',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const sessionIdFinal = sessionId || `session_${Date.now()}`;
-    
-    this.logger.log(`Nouvelle question reçue`, { 
-      sessionId: sessionIdFinal, 
+
+    this.logger.log(`Nouvelle question reçue`, {
+      sessionId: sessionIdFinal,
       questionLength: question.length,
       page,
-      limit 
+      limit,
     });
 
-    const answer = await this.openaiService.chatWithTools(question, sessionIdFinal);
-    
-    this.logger.log(`Réponse générée avec succès`, { 
-      sessionId: sessionIdFinal, 
-      answerLength: answer.length 
-    });
+    try {
+      const answer = await this.openaiService.chatWithTools(
+        question,
+        sessionIdFinal,
+      );
 
-    return {
-      answer,
-      sessionId: sessionIdFinal,
-      pagination: {
-        page: paginationValidation.sanitized!.page,
-        limit: paginationValidation.sanitized!.limit,
-        total: 0, // À implémenter si nécessaire
-      },
-    };
+      // Vérifier si la réponse contient une erreur
+      if (answer && answer.includes('Erreur lors du traitement')) {
+        this.logger.error(`Erreur détectée dans la réponse`, {
+          sessionId: sessionIdFinal,
+          answer,
+        });
+        throw new HttpException(answer, HttpStatus.INTERNAL_SERVER_ERROR);
+      }
+
+      this.logger.log(`Réponse générée avec succès`, {
+        sessionId: sessionIdFinal,
+        answerLength: answer.length,
+      });
+
+      const response = {
+        answer,
+        sessionId: sessionIdFinal,
+        pagination: {
+          page: paginationValidation.sanitized!.page,
+          limit: paginationValidation.sanitized!.limit,
+          total: 0, // À implémenter si nécessaire
+        },
+      };
+
+      this.logger.log(`=== FIN REQUÊTE SUCCÈS ===`, {
+        sessionId: sessionIdFinal,
+        responseLength: JSON.stringify(response).length,
+      });
+
+      return response;
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Erreur inconnue';
+
+      this.logger.error(`Erreur lors du traitement de la question`, {
+        sessionId: sessionIdFinal,
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      if (error instanceof HttpException) {
+        this.logger.error(`=== FIN REQUÊTE ERREUR HTTP ===`, {
+          status: error.getStatus(),
+          message: error.message,
+        });
+        throw error;
+      }
+
+      this.logger.error(`=== FIN REQUÊTE ERREUR INTERNE ===`, {
+        message: errorMessage,
+      });
+
+      throw new HttpException(
+        `Erreur lors du traitement : ${errorMessage}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Get()
@@ -79,10 +153,10 @@ export class ChatController {
     }
 
     const messages = await this.sessionService.getSession(sessionId);
-    
-    this.logger.log(`Historique de session récupéré`, { 
-      sessionId, 
-      messageCount: messages.length 
+
+    this.logger.log(`Historique de session récupéré`, {
+      sessionId,
+      messageCount: messages.length,
     });
 
     return {
@@ -99,7 +173,7 @@ export class ChatController {
     }
 
     await this.sessionService.setSession(sessionId, []);
-    
+
     this.logger.log(`Session effacée`, { sessionId });
 
     return {

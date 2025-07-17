@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { join } from 'path';
-import { Low, JSONFile } from 'lowdb';
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
 
-interface Message {
+export interface Message {
   role: 'user' | 'assistant' | 'function';
   content: string;
   name?: string;
@@ -28,7 +29,7 @@ export class SessionService {
 
   constructor() {
     const adapter = new JSONFile<Data>(dbFile);
-    this.db = new Low<Data>(adapter);
+    this.db = new Low<Data>(adapter, { sessions: [] });
   }
 
   async load(): Promise<void> {
@@ -38,50 +39,50 @@ export class SessionService {
 
   async getSession(sessionId: string): Promise<Message[]> {
     await this.load();
-    const session = this.db.data!.sessions.find((s) => s.id === sessionId);
+    const session = this.db.data.sessions.find((s) => s.id === sessionId);
     return session ? session.messages : [];
   }
 
   async saveMessage(sessionId: string, message: Message): Promise<void> {
     await this.load();
-    let session = this.db.data!.sessions.find((s) => s.id === sessionId);
+    let session = this.db.data.sessions.find((s) => s.id === sessionId);
     if (!session) {
-      session = { 
-        id: sessionId, 
+      session = {
+        id: sessionId,
         messages: [],
         createdAt: new Date().toISOString(),
-        lastActivity: new Date().toISOString()
+        lastActivity: new Date().toISOString(),
       };
-      this.db.data!.sessions.push(session);
+      this.db.data.sessions.push(session);
     }
-    
+
     // Ajouter timestamp si manquant
     if (!message.timestamp) {
       message.timestamp = new Date().toISOString();
     }
-    
+
     session.messages.push(message);
     session.lastActivity = new Date().toISOString();
-    
+
     // Limiter l'historique à 50 messages par session
     if (session.messages.length > 50) {
       session.messages = session.messages.slice(-50);
     }
-    
+
     await this.db.write();
   }
 
   async setSession(sessionId: string, messages: Message[]): Promise<void> {
     await this.load();
-    let session = this.db.data!.sessions.find((s) => s.id === sessionId);
+    let session = this.db.data.sessions.find((s) => s.id === sessionId);
     if (!session) {
-      session = { 
-        id: sessionId, 
+      session = {
+        id: sessionId,
         messages: [],
         createdAt: new Date().toISOString(),
-        lastActivity: new Date().toISOString()
+        lastActivity: new Date().toISOString(),
       };
-      this.db.data!.sessions.push(session);
+      this.db.data.sessions.push(session);
     }
     session.messages = messages;
     session.lastActivity = new Date().toISOString();
@@ -91,9 +92,9 @@ export class SessionService {
   async cleanupOldSessions(maxAgeHours: number = 24): Promise<void> {
     await this.load();
     const cutoff = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
-    this.db.data!.sessions = this.db.data!.sessions.filter(
-      session => new Date(session.lastActivity) > cutoff
+    this.db.data.sessions = this.db.data.sessions.filter(
+      (session) => new Date(session.lastActivity) > cutoff,
     );
     await this.db.write();
   }
-} 
+}

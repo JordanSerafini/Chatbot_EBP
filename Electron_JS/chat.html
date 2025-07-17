@@ -114,34 +114,60 @@
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
+      
+      console.log('=== DÉBUT REQUÊTE FRONTEND ===', { question: text });
+      
       const userBubble = document.createElement('div');
       userBubble.className = 'bubble user';
       userBubble.textContent = text;
       chat.appendChild(userBubble);
       input.value = '';
       chat.scrollTop = chat.scrollHeight;
+      
       // Appel réel à l'API du chatbot
+      const requestBody = { question: text };
+      console.log('Corps de la requête:', requestBody);
+      
       fetch('http://localhost:3001/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text })
+        body: JSON.stringify(requestBody)
       })
-        .then(response => response.json())
+        .then(response => {
+          console.log('Réponse reçue:', {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            headers: Object.fromEntries(response.headers.entries())
+          });
+          
+          if (!response.ok) {
+            return response.json().then(errorData => {
+              console.error('Erreur HTTP détectée:', errorData);
+              throw new Error(errorData.message || `Erreur ${response.status}: ${response.statusText}`);
+            });
+          }
+          return response.json();
+        })
         .then(data => {
+          console.log('Données reçues:', data);
           const botBubble = document.createElement('div');
           botBubble.className = 'bubble';
           botBubble.textContent = data.answer || 'Erreur : pas de réponse du bot';
           chat.appendChild(botBubble);
           chat.scrollTop = chat.scrollHeight;
           checkStatus();
+          console.log('=== FIN REQUÊTE FRONTEND SUCCÈS ===');
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('Erreur frontend:', error);
           const botBubble = document.createElement('div');
           botBubble.className = 'bubble';
-          botBubble.textContent = 'Erreur de connexion au chatbot';
+          botBubble.textContent = error.message || 'Erreur de connexion au chatbot';
           chat.appendChild(botBubble);
           chat.scrollTop = chat.scrollHeight;
           setStatus('#F44336', 'Erreur de connexion au chatbot');
+          console.log('=== FIN REQUÊTE FRONTEND ERREUR ===');
         });
     });
   </script>
