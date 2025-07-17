@@ -26,9 +26,25 @@ export const SEMANTIC_MAPPINGS: SemanticMapping[] = [
     columns: ['IdDeal', 'DateDeal', 'MontantTotal', 'IdCustomer', 'IdSupplier'],
   },
   {
+    keywords: ['facture', 'invoice'],
+    table: 'Invoice',
+    columns: ['IdInvoice', 'DateInvoice', 'MontantTotal', 'IdSupplier'],
+  },
+  {
     keywords: ['produit', 'item', 'article'],
     table: 'Item',
     columns: ['IdItem', 'Nom', 'PrixUnitaire'],
+  },
+  // Mapping relationnel pour analyses croisées
+  {
+    keywords: ['fournisseur', 'principal', 'top', 'plus gros', 'plus actif'],
+    table: 'Deal',
+    columns: ['IdSupplier', 'MontantTotal'],
+  },
+  {
+    keywords: ['fournisseur', 'facture', 'montant'],
+    table: 'Invoice',
+    columns: ['IdSupplier', 'MontantTotal'],
   },
   // ... à compléter selon le modèle de données
 ];

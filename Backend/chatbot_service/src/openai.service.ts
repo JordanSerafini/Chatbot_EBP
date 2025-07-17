@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MCPClientService } from './mcp/mcp-client.service';
-import { AnswerFormatterService } from './answer-formatter.service';
+import { AnswerFormatterService, FormattedAnswer } from './answer-formatter.service';
 import { SessionService } from './session.service';
 import { SecurityService } from './security.service';
 import { PromptService } from './prompt.service';
@@ -277,15 +277,65 @@ export class OpenAIService {
 
       // Si aucune réponse textuelle, utiliser AnswerFormatterService
       if (!lastResponse && lastFunctionResult && lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
-        const formattedResponse = this.answerFormatter.formatAnswer(question, lastFunctionResult.data);
-        
+        // Génération automatique d'une réponse enrichie
+        const data = lastFunctionResult.data;
+        let summary = "Voici les résultats de votre requête.";
+        let tables: { name: string; description?: string }[] = [];
+        let suggestions: string[] = [];
+        let exportLink: string | undefined = undefined;
+        let chartSuggestion: string | undefined = undefined;
+        let details: any = data;
+        let markdownTable = '';
+
+        if (data.length > 0) {
+          // Générer le tableau markdown
+          const columns = Object.keys(data[0]);
+          markdownTable = '| ' + columns.join(' | ') + ' |\n';
+          markdownTable += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
+          markdownTable += data.slice(0, 10).map(row =>
+            '| ' + columns.map(col => String(row[col])).join(' | ') + ' |'
+          ).join('\n');
+
+          // Détection automatique des tables utilisées (si possible)
+          if (data[0]._table) {
+            tables = [{ name: data[0]._table }];
+          }
+
+          // Suggestions d'analyse complémentaires
+          if (columns.includes('Date') || columns.some(c => c.toLowerCase().includes('date'))) {
+            suggestions.push('Vous pouvez demander une analyse temporelle ou une répartition par période.');
+            chartSuggestion = 'Graphique temporel possible.';
+          }
+          if (columns.some(c => c.toLowerCase().includes('montant') || c.toLowerCase().includes('total'))) {
+            suggestions.push('Vous pouvez demander un classement par montant ou une analyse des plus gros volumes.');
+            chartSuggestion = 'Histogramme ou bar chart pertinent.';
+          }
+          if (data.length >= 10000) {
+            suggestions.push('Attention : le volume de données est important, pensez à filtrer ou paginer.');
+          }
+          exportLink = undefined; // À implémenter si export CSV disponible
+        } else {
+          summary = "Aucune donnée trouvée pour cette requête.";
+          markdownTable = 'Aucune donnée.';
+        }
+
+        const formattedResponse = this.answerFormatter.format(
+          summary,
+          tables,
+          markdownTable,
+          suggestions,
+          exportLink,
+          chartSuggestion,
+          details,
+        );
+
         await this.sessionService.saveMessage(sessionIdFinal, {
           role: 'assistant',
-          content: formattedResponse.message,
+          content: formattedResponse.summary + '\n' + formattedResponse.markdownTable,
           timestamp: new Date().toISOString(),
         });
-        
-        return formattedResponse.message;
+
+        return formattedResponse.summary + '\n' + formattedResponse.markdownTable;
       }
 
       return lastResponse || 'Aucune réponse générée.';

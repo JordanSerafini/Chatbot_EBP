@@ -11,10 +11,7 @@ import {
 import { OpenAIService } from '../openai.service';
 import { SessionService } from '../session.service';
 import { SecurityService } from '../security.service';
-import {
-  AnswerFormatterService,
-  FormattedResponse,
-} from '../answer-formatter.service';
+import { AnswerFormatterService, FormattedAnswer } from '../answer-formatter.service';
 
 interface AskRequest {
   question: string;
@@ -26,7 +23,7 @@ interface AskRequest {
 interface AskResponse {
   answer: string;
   sessionId: string;
-  formattedResponse?: FormattedResponse;
+  formattedResponse?: FormattedAnswer;
   pagination?: {
     page: number;
     limit: number;
@@ -103,7 +100,7 @@ export class ChatController {
       });
 
       // Essayer de formater la réponse si c'est une requête de données
-      let formattedResponse: FormattedResponse | undefined;
+      let formattedResponse: FormattedAnswer | undefined;
       try {
         // Vérifier si la réponse contient des données JSON (cas où OpenAI a utilisé un outil)
         const sessionMessages = await this.sessionService.getSession(sessionIdFinal);
@@ -118,10 +115,8 @@ export class ChatController {
             Array.isArray(functionResult.data) &&
             functionResult.data.length > 0
           ) {
-            formattedResponse = this.answerFormatter.formatAnswer(
-              question,
-              functionResult.data,
-            );
+            const { summary, tables, markdownTable, suggestions, exportLink, chartSuggestion, details } = functionResult.data[0];
+            formattedResponse = this.answerFormatter.format(summary, tables, markdownTable, suggestions, exportLink, chartSuggestion, details);
           }
         }
       } catch (formatError) {

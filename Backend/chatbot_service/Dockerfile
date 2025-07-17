@@ -24,6 +24,9 @@ COPY eslint.config.mjs ./
 # Build
 RUN npm run build
 
+# Après RUN npm run build
+RUN cp -r src/prompts dist/prompts
+
 # Nettoyage : prod only
 RUN npm ci --only=production && npm cache clean --force
 

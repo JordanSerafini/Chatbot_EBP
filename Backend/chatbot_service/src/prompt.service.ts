@@ -83,4 +83,16 @@ export class PromptService {
       offset: (page - 1) * limit,
     });
   }
+
+  /**
+   * Génère un prompt de relance intelligente si la table principale ne suffit pas
+   */
+  getExplorationPrompt(mainTable: string, relatedTables: string[]): string {
+    return `La table "${mainTable}" ne permet pas d'identifier précisément les "principaux" éléments demandés.
+
+Je peux explorer automatiquement les tables suivantes pour affiner l'analyse :
+${relatedTables.map((t) => `- ${t}`).join('\n')}
+
+Voulez-vous que je recherche les fournisseurs principaux par nombre de commandes, montant total, ou via une autre table ?`;
+  }
 }
