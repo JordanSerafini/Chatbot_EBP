@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && (cp src/stdio-wrapper-ebp.js dist/stdio-wrapper-ebp.js || copy src\\stdio-wrapper-ebp.js dist\\stdio-wrapper-ebp.js)",
     "start": "node dist/index.js",
     "start:http": "node dist/http-server.js",
     "dev": "tsc --watch & node --watch dist/index.js",

@@ -80,6 +80,17 @@ export class OpenAIService {
     ];
   }
 
+  // Utilitaire : extrait les noms de tables d'une requête SQL (FROM, JOIN, INTO, UPDATE)
+  private extractTableNames(sql: string): string[] {
+    const regex = /\b(?:FROM|JOIN|INTO|UPDATE)\s+"?([A-Za-z0-9_]+)"?/gi;
+    const tables = new Set<string>();
+    let match;
+    while ((match = regex.exec(sql))) {
+      tables.add(match[1]);
+    }
+    return Array.from(tables);
+  }
+
   // Fonction principale : dialogue avec OpenAI + MCP tools
   async chatWithTools(question: string, sessionId?: string): Promise<string> {
     const systemPrompt =
@@ -88,7 +99,7 @@ export class OpenAIService {
       `- Entoure systématiquement les noms de colonnes et de tables de guillemets doubles.\n` +
       `- Ajoute toujours une clause LIMIT avec un nombre (ex : LIMIT 10) sauf pour les agrégats (SUM, COUNT...).`;
 
-    let messages = [
+    const messages = [
       {
         role: 'system',
         content: systemPrompt,
@@ -126,39 +137,54 @@ export class OpenAIService {
           try {
             args = JSON.parse(argsStr);
           } catch (e) {
-            this.logger.error('Erreur parsing arguments function_call:', argsStr);
+            this.logger.error(
+              'Erreur parsing arguments function_call:',
+              argsStr,
+            );
           }
           let result: any = null;
           try {
-          if (name === 'queryMCP') {
-            result = await this.mcpClient.executeQuery(
-              args.query,
-              args.limit || 100,
-            );
-          } else if (name === 'listTablesMCP') {
-            result = await this.mcpClient.listTables();
-          } else if (name === 'describeTableMCP') {
-            result = await this.mcpClient.describeTable(args.tableName);
-          } else if (name === 'analyzeTableMCP') {
-            result = await this.mcpClient.analyzeTable(
-              args.tableName,
-              args.columns,
-            );
-          } else if (name === 'getSchemaMCP') {
-            result = await this.mcpClient.getSchema();
-          }
+            if (name === 'queryMCP') {
+              // Récupère le schéma avant chaque requête SQL
+              const schema = await this.mcpClient.getSchema();
+              // Décrit toutes les tables utilisées dans la requête
+              const tableNames = this.extractTableNames(args.query);
+              for (const table of tableNames) {
+                await this.mcpClient.describeTable(table);
+              }
+              // (Optionnel) On pourrait utiliser ce schéma et ces descriptions pour valider/corriger la requête ici
+              result = await this.mcpClient.executeQuery(
+                args.query,
+                args.limit || 100,
+              );
+            } else if (name === 'listTablesMCP') {
+              result = await this.mcpClient.listTables();
+            } else if (name === 'describeTableMCP') {
+              result = await this.mcpClient.describeTable(args.tableName);
+            } else if (name === 'analyzeTableMCP') {
+              result = await this.mcpClient.analyzeTable(
+                args.tableName,
+                args.columns,
+              );
+            } else if (name === 'getSchemaMCP') {
+              result = await this.mcpClient.getSchema();
+            }
             lastFunctionResult = result; // On stocke le dernier résultat MCP
-          messages.push({
-            role: 'function',
-            name,
-            content: JSON.stringify(result),
-          } as any);
-          continue; // relance la boucle pour obtenir la réponse finale
+            messages.push({
+              role: 'function',
+              name,
+              content: JSON.stringify(result),
+            } as any);
+            continue; // relance la boucle pour obtenir la réponse finale
           } catch (err: any) {
             // Fallback automatique si colonne n'existe pas
             const errMsg = String(err?.message || '').toLowerCase();
             const tableMatch = args.query?.match(/from\s+"?([a-zA-Z0-9_]+)"?/i);
-            if (errMsg.includes('colonne') && errMsg.includes('existe pas') && tableMatch) {
+            if (
+              errMsg.includes('colonne') &&
+              errMsg.includes('existe pas') &&
+              tableMatch
+            ) {
               const tableName = tableMatch[1];
               if (lastTriedTable === tableName) {
                 // On a déjà tenté le fallback sur cette table, on arrête pour éviter la boucle
@@ -168,7 +194,11 @@ export class OpenAIService {
               // On récupère la description de la table
               const desc = await this.mcpClient.describeTable(tableName);
               if (desc && Array.isArray(desc) && desc.length > 0) {
-                const colList = desc.map((col: any) => `- "${col.column_name}" (${col.data_type})`).join('\n');
+                const colList = desc
+                  .map(
+                    (col: any) => `- "${col.column_name}" (${col.data_type})`,
+                  )
+                  .join('\n');
                 // On reformule la question à l'agent avec la liste des colonnes réelles
                 messages.push({
                   role: 'system',
@@ -185,13 +215,23 @@ export class OpenAIService {
         }
       }
       // Si aucune réponse textuelle, on utilise le AnswerFormatterService pour formater la réponse à partir des données SQL
-      if (!lastResponse && lastFunctionResult && lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
-        return this.answerFormatter.formatAnswer(question, lastFunctionResult.data);
+      if (
+        !lastResponse &&
+        lastFunctionResult &&
+        lastFunctionResult.data &&
+        Array.isArray(lastFunctionResult.data)
+      ) {
+        return this.answerFormatter.formatAnswer(
+          question,
+          lastFunctionResult.data,
+        );
       }
       return lastResponse || 'Aucune réponse générée.';
     } catch (error: any) {
       // Log uniquement le message d'erreur principal, tronqué si besoin
-      const errMsg = error?.message ? String(error.message).slice(0, 300) : 'Erreur inconnue';
+      const errMsg = error?.message
+        ? String(error.message).slice(0, 300)
+        : 'Erreur inconnue';
       this.logger.error('Erreur OpenAIService:', errMsg);
       return 'Erreur lors du traitement : ' + errMsg;
     }
