@@ -1,3 +1,4 @@
+
 import { Injectable } from '@nestjs/common';
 import { MCPClientService } from './mcp/mcp-client.service';
 
@@ -8,7 +9,11 @@ export class AnalysisOrchestratorService {
   /**
    * Orchestration complète : listage, description, analyse, requête
    */
-  async fullAnalysisWorkflow(query: string, tableNames: string[], columns?: string[]): Promise<any> {
+  async fullAnalysisWorkflow(
+    query: string,
+    tableNames: string[],
+    columns?: string[],
+  ): Promise<any> {
     // 1. Lister les tables
     const tables = await this.mcp.listTables();
     // 2. Décrire les tables pertinentes
@@ -32,13 +37,26 @@ export class AnalysisOrchestratorService {
   /**
    * Orchestration multi-analyses : permet d'enchaîner plusieurs requêtes/analyses pour enrichir la réponse
    */
-  async orchestrateMultiAnalysis(queries: { query: string; tableNames: string[]; columns?: string[]; label?: string }[]): Promise<any[]> {
+  async orchestrateMultiAnalysis(
+    queries: {
+      query: string;
+      tableNames: string[];
+      columns?: string[];
+      label?: string;
+    }[],
+  ): Promise<any[]> {
     // Exécute chaque analyse en parallèle, retourne un tableau de résultats labellisés
     return Promise.all(
-      queries.map(async ({ query, tableNames, columns, label }) => {
-        const result = await this.fullAnalysisWorkflow(query, tableNames, columns);
-        return { label, ...result };
-      })
+      queries.map(
+        async ({ query, tableNames, columns, label }) => {
+          const result = await this.fullAnalysisWorkflow(
+            query,
+            tableNames,
+            columns,
+          );
+          return { label, ...result };
+        },
+      ),
     );
   }
 } 
