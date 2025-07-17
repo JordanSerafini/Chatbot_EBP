@@ -13,16 +13,21 @@ function log(action, details = {}) {
 
 function createRobotWindow() {
   const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
+  const robotSize = 200;
+  const margin = 20;
   robotWindow = new BrowserWindow({
-    width: 120,
-    height: 120,
-    x: width - 140,
-    y: height - 140,
+    width: robotSize,
+    height: robotSize,
+    x: margin,
+    y: height - robotSize - margin,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     hasShadow: false,
     resizable: false,
+    roundedCorners: true,
+    backgroundColor: '#00000000',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -31,8 +36,10 @@ function createRobotWindow() {
       sandbox: true
     },
   });
+  console.log('Robot path:', path.join(__dirname, '../renderer/robot.html'));
   robotWindow.loadFile(path.join(__dirname, '../renderer/robot.html'));
   robotWindow.setIgnoreMouseEvents(false);
+  robotWindow.once('ready-to-show', () => robotWindow.show());
   robotWindow.on('closed', () => { robotWindow = null; log('robotWindow.closed'); });
   log('robotWindow.opened');
 }

@@ -3,12 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <title>Robot</title>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;">
-  <meta name="viewport" content="width=120, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: file:;">
+  <meta name="viewport" content="width=200, initial-scale=1.0">
   <style>
-    html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; width: 100%; height: 100%; }
-    #robot { width: 100%; height: 100%; cursor: pointer; user-select: none; -webkit-user-drag: none; display: flex; align-items: center; justify-content: center; }
-    img { width: 100%; height: 100%; pointer-events: none; -webkit-user-drag: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent !important;
+      overflow: hidden !important;
+    }
+    #robot {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      overflow: hidden;
+      box-shadow: none;
+      cursor: pointer;
+    }
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 50%;
+      background: transparent;
+      pointer-events: none;
+      -webkit-user-drag: none;
+      box-shadow: none;
+      display: block;
+    }
   </style>
 </head>
 <body>
