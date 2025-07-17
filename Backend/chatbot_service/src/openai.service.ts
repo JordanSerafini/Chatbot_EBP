@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MCPClientService } from './mcp/mcp-client.service';
-import { AnswerFormatterService, FormattedAnswer } from './answer-formatter.service';
+import { AnswerFormatterService } from './answer-formatter.service';
 import { SessionService } from './session.service';
 import { SecurityService } from './security.service';
 import { PromptService } from './prompt.service';
@@ -66,7 +66,8 @@ export class OpenAIService {
       },
       {
         name: 'analyzeTableMCP',
-        description: "Analyse les données d'une table (statistiques, etc.) via MCP",
+        description:
+          "Analyse les données d'une table (statistiques, etc.) via MCP",
         parameters: {
           type: 'object',
           properties: {
@@ -104,11 +105,12 @@ export class OpenAIService {
   // Fonction principale : dialogue avec OpenAI + MCP tools avec gestion de session
   async chatWithTools(question: string, sessionId?: string): Promise<string> {
     const sessionIdFinal = sessionId || `session_${Date.now()}`;
-    
+
     try {
       // Charger l'historique de session
-      const sessionMessages = await this.sessionService.getSession(sessionIdFinal);
-      
+      const sessionMessages =
+        await this.sessionService.getSession(sessionIdFinal);
+
       // Construire les messages avec l'historique
       const messages = [
         {
@@ -155,33 +157,40 @@ export class OpenAIService {
           },
         );
 
-        const choice = response.data.choices[0] as any;
-        const msg = choice.message as any;
+        const choice = response.data.choices[0];
+        const msg = choice.message;
 
         if (msg.function_call) {
           // Appel d'un tool MCP demandé par OpenAI
           const { name, arguments: argsStr } = msg.function_call;
           let args: any = {};
-          
+
           try {
             args = JSON.parse(argsStr);
           } catch (e) {
-            this.logger.error('Erreur parsing arguments function_call:', argsStr, { sessionId: sessionIdFinal });
+            this.logger.error(
+              'Erreur parsing arguments function_call:',
+              argsStr,
+              { sessionId: sessionIdFinal },
+            );
           }
 
           let result: any = null;
-          
+
           try {
             if (name === 'queryMCP') {
               // Validation de sécurité
-              const validation = this.securityService.validateQuery(args.query, sessionIdFinal);
+              const validation = this.securityService.validateQuery(
+                args.query,
+                sessionIdFinal,
+              );
               if (!validation.isValid) {
                 throw new Error(validation.error);
               }
 
               // Récupère le schéma avant chaque requête SQL
               const schema = await this.mcpClient.getSchema();
-              
+
               // Décrit toutes les tables utilisées dans la requête
               const tableNames = this.extractTableNames(args.query);
               for (const table of tableNames) {
@@ -198,24 +207,30 @@ export class OpenAIService {
             } else if (name === 'describeTableMCP') {
               result = await this.mcpClient.describeTable(args.tableName);
             } else if (name === 'analyzeTableMCP') {
-              result = await this.mcpClient.analyzeTable(args.tableName, args.columns);
+              result = await this.mcpClient.analyzeTable(
+                args.tableName,
+                args.columns,
+              );
             } else if (name === 'getSchemaMCP') {
               result = await this.mcpClient.getSchema();
             }
 
             // Vérifier si le résultat contient une erreur
             if (result && result.error) {
-              this.logger.warn(`Erreur MCP détectée pour ${name}:`, result.message);
+              this.logger.warn(
+                `Erreur MCP détectée pour ${name}:`,
+                result.message,
+              );
               // Continuer avec un message d'erreur informatif plutôt que de faire échouer
               result = {
                 success: false,
                 message: result.message,
-                data: []
+                data: [],
               };
             }
 
             lastFunctionResult = result;
-            
+
             // Sauvegarder le résultat de la fonction
             await this.sessionService.saveMessage(sessionIdFinal, {
               role: 'function',
@@ -223,34 +238,39 @@ export class OpenAIService {
               name,
               timestamp: new Date().toISOString(),
             });
-            
+
             messages.push({
               role: 'function',
               name,
               content: JSON.stringify(result),
             } as any);
-            
+
             continue; // relance la boucle pour obtenir la réponse finale
-            
           } catch (err: any) {
             // Fallback automatique si colonne n'existe pas
             const errMsg = String(err?.message || '').toLowerCase();
             const tableMatch = args.query?.match(/from\s+"?([a-zA-Z0-9_]+)"?/i);
-            
-            if (errMsg.includes('colonne') && errMsg.includes('existe pas') && tableMatch) {
+
+            if (
+              errMsg.includes('colonne') &&
+              errMsg.includes('existe pas') &&
+              tableMatch
+            ) {
               const tableName = tableMatch[1];
               if (lastTriedTable === tableName) {
                 throw err;
               }
               lastTriedTable = tableName;
-              
+
               // Récupère la description de la table
               const desc = await this.mcpClient.describeTable(tableName);
               if (desc && Array.isArray(desc) && desc.length > 0) {
                 const colList = desc
-                  .map((col: any) => `- "${col.column_name}" (${col.data_type})`)
+                  .map(
+                    (col: any) => `- "${col.column_name}" (${col.data_type})`,
+                  )
                   .join('\n');
-                
+
                 messages.push({
                   role: 'system',
                   content: `Voici la liste exacte des colonnes de la table "${tableName}" :\n${colList}\nUtilise ces noms de colonnes pour générer la requête SQL.`,
@@ -276,15 +296,20 @@ export class OpenAIService {
       }
 
       // Si aucune réponse textuelle, utiliser AnswerFormatterService
-      if (!lastResponse && lastFunctionResult && lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
+      if (
+        !lastResponse &&
+        lastFunctionResult &&
+        lastFunctionResult.data &&
+        Array.isArray(lastFunctionResult.data)
+      ) {
         // Génération automatique d'une réponse enrichie
         const data = lastFunctionResult.data;
-        let summary = "Voici les résultats de votre requête.";
+        let summary = 'Voici les résultats de votre requête.';
         let tables: { name: string; description?: string }[] = [];
-        let suggestions: string[] = [];
+        const suggestions: string[] = [];
         let exportLink: string | undefined = undefined;
         let chartSuggestion: string | undefined = undefined;
-        let details: any = data;
+        const details: any = data;
         let markdownTable = '';
 
         if (data.length > 0) {
@@ -292,9 +317,15 @@ export class OpenAIService {
           const columns = Object.keys(data[0]);
           markdownTable = '| ' + columns.join(' | ') + ' |\n';
           markdownTable += '| ' + columns.map(() => '---').join(' | ') + ' |\n';
-          markdownTable += data.slice(0, 10).map(row =>
-            '| ' + columns.map(col => String(row[col])).join(' | ') + ' |'
-          ).join('\n');
+          markdownTable += data
+            .slice(0, 10)
+            .map(
+              (row) =>
+                '| ' +
+                columns.map((col) => String(row[col])).join(' | ') +
+                ' |',
+            )
+            .join('\n');
 
           // Détection automatique des tables utilisées (si possible)
           if (data[0]._table) {
@@ -302,20 +333,35 @@ export class OpenAIService {
           }
 
           // Suggestions d'analyse complémentaires
-          if (columns.includes('Date') || columns.some(c => c.toLowerCase().includes('date'))) {
-            suggestions.push('Vous pouvez demander une analyse temporelle ou une répartition par période.');
+          if (
+            columns.includes('Date') ||
+            columns.some((c) => c.toLowerCase().includes('date'))
+          ) {
+            suggestions.push(
+              'Vous pouvez demander une analyse temporelle ou une répartition par période.',
+            );
             chartSuggestion = 'Graphique temporel possible.';
           }
-          if (columns.some(c => c.toLowerCase().includes('montant') || c.toLowerCase().includes('total'))) {
-            suggestions.push('Vous pouvez demander un classement par montant ou une analyse des plus gros volumes.');
+          if (
+            columns.some(
+              (c) =>
+                c.toLowerCase().includes('montant') ||
+                c.toLowerCase().includes('total'),
+            )
+          ) {
+            suggestions.push(
+              'Vous pouvez demander un classement par montant ou une analyse des plus gros volumes.',
+            );
             chartSuggestion = 'Histogramme ou bar chart pertinent.';
           }
           if (data.length >= 10000) {
-            suggestions.push('Attention : le volume de données est important, pensez à filtrer ou paginer.');
+            suggestions.push(
+              'Attention : le volume de données est important, pensez à filtrer ou paginer.',
+            );
           }
           exportLink = undefined; // À implémenter si export CSV disponible
         } else {
-          summary = "Aucune donnée trouvée pour cette requête.";
+          summary = 'Aucune donnée trouvée pour cette requête.';
           markdownTable = 'Aucune donnée.';
         }
 
@@ -331,26 +377,32 @@ export class OpenAIService {
 
         await this.sessionService.saveMessage(sessionIdFinal, {
           role: 'assistant',
-          content: formattedResponse.summary + '\n' + formattedResponse.markdownTable,
+          content:
+            formattedResponse.summary + '\n' + formattedResponse.markdownTable,
           timestamp: new Date().toISOString(),
         });
 
-        return formattedResponse.summary + '\n' + formattedResponse.markdownTable;
+        return (
+          formattedResponse.summary + '\n' + formattedResponse.markdownTable
+        );
       }
 
       return lastResponse || 'Aucune réponse générée.';
-      
     } catch (error: any) {
-      const errMsg = error?.message ? String(error.message).slice(0, 300) : 'Erreur inconnue';
-      this.logger.error('Erreur OpenAIService:', errMsg, { sessionId: sessionIdFinal });
-      
+      const errMsg = error?.message
+        ? String(error.message).slice(0, 300)
+        : 'Erreur inconnue';
+      this.logger.error('Erreur OpenAIService:', errMsg, {
+        sessionId: sessionIdFinal,
+      });
+
       // Sauvegarder l'erreur dans la session
       await this.sessionService.saveMessage(sessionIdFinal, {
         role: 'assistant',
         content: `Erreur lors du traitement : ${errMsg}`,
         timestamp: new Date().toISOString(),
       });
-      
+
       return 'Erreur lors du traitement : ' + errMsg;
     }
   }
@@ -358,6 +410,8 @@ export class OpenAIService {
   // Méthode pour nettoyer les anciennes sessions
   async cleanupOldSessions(maxAgeHours: number = 24): Promise<void> {
     await this.sessionService.cleanupOldSessions(maxAgeHours);
-    this.logger.log(`Nettoyage des sessions de plus de ${maxAgeHours}h terminé`);
+    this.logger.log(
+      `Nettoyage des sessions de plus de ${maxAgeHours}h terminé`,
+    );
   }
 }
