@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "csv-stringify": "^6.6.0",
-    "lowdb": "^7.0.1"
-  }
-}
