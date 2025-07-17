@@ -10,6 +10,10 @@ COPY package*.json ./
 COPY tsconfig*.json ./
 COPY nest-cli.json ./
 
+# Installation des dépendances système nécessaires à node-gyp/canvas/chartjs
+RUN apk add --no-cache python3 make g++ pkgconfig pixman-dev cairo-dev pango-dev jpeg-dev giflib-dev \
+    && ln -sf python3 /usr/bin/python
+
 RUN npm ci
 
 # Copie du code source (hors tests)

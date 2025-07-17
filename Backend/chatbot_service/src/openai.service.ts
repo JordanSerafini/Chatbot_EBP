@@ -1,8 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MCPClientService } from './mcp/mcp-client.service';
-import axios from 'axios';
 import { AnswerFormatterService } from './answer-formatter.service';
+import { SessionService } from './session.service';
+import { SecurityService } from './security.service';
+import { PromptService } from './prompt.service';
+import axios from 'axios';
 
 @Injectable()
 export class OpenAIService {
@@ -14,6 +17,9 @@ export class OpenAIService {
     private readonly configService: ConfigService,
     private readonly mcpClient: MCPClientService,
     private readonly answerFormatter: AnswerFormatterService,
+    private readonly sessionService: SessionService,
+    private readonly securityService: SecurityService,
+    private readonly promptService: PromptService,
   ) {
     const key = this.configService.get<string>('OPENAI_API_KEY');
     if (!key) throw new Error('OPENAI_API_KEY manquant');
@@ -25,16 +31,12 @@ export class OpenAIService {
     return [
       {
         name: 'queryMCP',
-        description: 'Exécute une requête SQL sur le serveur MCP',
+        description: 'Exécute une requête SQL sécurisée sur le serveur MCP',
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'La requête SQL à exécuter' },
-            limit: {
-              type: 'integer',
-              description: 'Limite de résultats',
-              default: 100,
-            },
+            query: { type: 'string', description: 'La requête SQL SELECT à exécuter' },
+            limit: { type: 'integer', description: 'Limite de résultats', default: 100 },
           },
           required: ['query'],
         },
@@ -57,8 +59,7 @@ export class OpenAIService {
       },
       {
         name: 'analyzeTableMCP',
-        description:
-          "Analyse les données d'une table (statistiques, etc.) via MCP",
+        description: "Analyse les données d'une table (statistiques, etc.) via MCP",
         parameters: {
           type: 'object',
           properties: {
@@ -80,7 +81,7 @@ export class OpenAIService {
     ];
   }
 
-  // Utilitaire : extrait les noms de tables d'une requête SQL (FROM, JOIN, INTO, UPDATE)
+  // Utilitaire : extrait les noms de tables d'une requête SQL
   private extractTableNames(sql: string): string[] {
     const regex = /\b(?:FROM|JOIN|INTO|UPDATE)\s+"?([A-Za-z0-9_]+)"?/gi;
     const tables = new Set<string>();
@@ -91,28 +92,41 @@ export class OpenAIService {
     return Array.from(tables);
   }
 
-  // Fonction principale : dialogue avec OpenAI + MCP tools
+  // Fonction principale : dialogue avec OpenAI + MCP tools avec gestion de session
   async chatWithTools(question: string, sessionId?: string): Promise<string> {
-    const systemPrompt =
-      `Tu es un assistant connecté à une base de données métier. Utilise les fonctions MCP pour répondre aux questions en interrogeant la base si besoin. Quand tu génères une requête SQL :\n` +
-      `- Utilise exactement les noms de colonnes et de tables tels qu’ils apparaissent dans la base (respecte la casse).\n` +
-      `- Entoure systématiquement les noms de colonnes et de tables de guillemets doubles.\n` +
-      `- Ajoute toujours une clause LIMIT avec un nombre (ex : LIMIT 10) sauf pour les agrégats (SUM, COUNT...).`;
-
-    const messages = [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
-      { role: 'user', content: question },
-    ];
-    let loopCount = 0;
-    let lastResponse: any = null;
-    let lastFunctionResult: any = null; // Pour stocker le dernier résultat MCP
-    let lastTriedTable: string | null = null;
+    const sessionIdFinal = sessionId || `session_${Date.now()}`;
+    
     try {
+      // Charger l'historique de session
+      const sessionMessages = await this.sessionService.getSession(sessionIdFinal);
+      
+      // Construire les messages avec l'historique
+      const messages = [
+        {
+          role: 'system',
+          content: this.promptService.getSystemPrompt(),
+        },
+        ...sessionMessages,
+        { role: 'user', content: question },
+      ];
+
+      // Sauvegarder la question utilisateur
+      await this.sessionService.saveMessage(sessionIdFinal, {
+        role: 'user',
+        content: question,
+        timestamp: new Date().toISOString(),
+      });
+
+      let loopCount = 0;
+      let lastResponse: any = null;
+      let lastFunctionResult: any = null;
+      let lastTriedTable: string | null = null;
+
       while (loopCount < 3) {
         loopCount++;
+        
+        this.logger.log(`Itération ${loopCount} pour la session ${sessionIdFinal}`, { sessionId: sessionIdFinal });
+        
         const response = await axios.post(
           this.openAIUrl,
           {
@@ -128,33 +142,43 @@ export class OpenAIService {
             },
           },
         );
+
         const choice = response.data.choices[0];
         const msg = choice.message;
+
         if (msg.function_call) {
           // Appel d'un tool MCP demandé par OpenAI
           const { name, arguments: argsStr } = msg.function_call;
           let args: any = {};
+          
           try {
             args = JSON.parse(argsStr);
           } catch (e) {
-            this.logger.error(
-              'Erreur parsing arguments function_call:',
-              argsStr,
-            );
+            this.logger.error('Erreur parsing arguments function_call:', argsStr, { sessionId: sessionIdFinal });
           }
+
           let result: any = null;
+          
           try {
             if (name === 'queryMCP') {
+              // Validation de sécurité
+              const validation = this.securityService.validateQuery(args.query, sessionIdFinal);
+              if (!validation.isValid) {
+                throw new Error(validation.error);
+              }
+
               // Récupère le schéma avant chaque requête SQL
               const schema = await this.mcpClient.getSchema();
+              
               // Décrit toutes les tables utilisées dans la requête
               const tableNames = this.extractTableNames(args.query);
               for (const table of tableNames) {
                 await this.mcpClient.describeTable(table);
               }
-              // (Optionnel) On pourrait utiliser ce schéma et ces descriptions pour valider/corriger la requête ici
+
+              // Exécute la requête sécurisée
               result = await this.mcpClient.executeQuery(
-                args.query,
+                validation.sanitizedQuery || args.query,
                 args.limit || 100,
               );
             } else if (name === 'listTablesMCP') {
@@ -162,49 +186,53 @@ export class OpenAIService {
             } else if (name === 'describeTableMCP') {
               result = await this.mcpClient.describeTable(args.tableName);
             } else if (name === 'analyzeTableMCP') {
-              result = await this.mcpClient.analyzeTable(
-                args.tableName,
-                args.columns,
-              );
+              result = await this.mcpClient.analyzeTable(args.tableName, args.columns);
             } else if (name === 'getSchemaMCP') {
               result = await this.mcpClient.getSchema();
             }
-            lastFunctionResult = result; // On stocke le dernier résultat MCP
+
+            lastFunctionResult = result;
+            
+            // Sauvegarder le résultat de la fonction
+            await this.sessionService.saveMessage(sessionIdFinal, {
+              role: 'function',
+              content: JSON.stringify(result),
+              name,
+              timestamp: new Date().toISOString(),
+            });
+            
             messages.push({
               role: 'function',
               name,
               content: JSON.stringify(result),
             } as any);
+            
             continue; // relance la boucle pour obtenir la réponse finale
+            
           } catch (err: any) {
             // Fallback automatique si colonne n'existe pas
             const errMsg = String(err?.message || '').toLowerCase();
             const tableMatch = args.query?.match(/from\s+"?([a-zA-Z0-9_]+)"?/i);
-            if (
-              errMsg.includes('colonne') &&
-              errMsg.includes('existe pas') &&
-              tableMatch
-            ) {
+            
+            if (errMsg.includes('colonne') && errMsg.includes('existe pas') && tableMatch) {
               const tableName = tableMatch[1];
               if (lastTriedTable === tableName) {
-                // On a déjà tenté le fallback sur cette table, on arrête pour éviter la boucle
                 throw err;
               }
               lastTriedTable = tableName;
-              // On récupère la description de la table
+              
+              // Récupère la description de la table
               const desc = await this.mcpClient.describeTable(tableName);
               if (desc && Array.isArray(desc) && desc.length > 0) {
                 const colList = desc
-                  .map(
-                    (col: any) => `- "${col.column_name}" (${col.data_type})`,
-                  )
+                  .map((col: any) => `- "${col.column_name}" (${col.data_type})`)
                   .join('\n');
-                // On reformule la question à l'agent avec la liste des colonnes réelles
+                
                 messages.push({
                   role: 'system',
                   content: `Voici la liste exacte des colonnes de la table "${tableName}" :\n${colList}\nUtilise ces noms de colonnes pour générer la requête SQL.`,
                 });
-                continue; // relance la boucle avec la nouvelle consigne
+                continue;
               }
             }
             throw err;
@@ -214,26 +242,49 @@ export class OpenAIService {
           break;
         }
       }
-      // Si aucune réponse textuelle, on utilise le AnswerFormatterService pour formater la réponse à partir des données SQL
-      if (
-        !lastResponse &&
-        lastFunctionResult &&
-        lastFunctionResult.data &&
-        Array.isArray(lastFunctionResult.data)
-      ) {
-        return this.answerFormatter.formatAnswer(
-          question,
-          lastFunctionResult.data,
-        );
+
+      // Sauvegarder la réponse de l'assistant
+      if (lastResponse) {
+        await this.sessionService.saveMessage(sessionIdFinal, {
+          role: 'assistant',
+          content: lastResponse,
+          timestamp: new Date().toISOString(),
+        });
       }
+
+      // Si aucune réponse textuelle, utiliser AnswerFormatterService
+      if (!lastResponse && lastFunctionResult && lastFunctionResult.data && Array.isArray(lastFunctionResult.data)) {
+        const formattedResponse = this.answerFormatter.formatAnswer(question, lastFunctionResult.data);
+        
+        await this.sessionService.saveMessage(sessionIdFinal, {
+          role: 'assistant',
+          content: formattedResponse,
+          timestamp: new Date().toISOString(),
+        });
+        
+        return formattedResponse;
+      }
+
       return lastResponse || 'Aucune réponse générée.';
+      
     } catch (error: any) {
-      // Log uniquement le message d'erreur principal, tronqué si besoin
-      const errMsg = error?.message
-        ? String(error.message).slice(0, 300)
-        : 'Erreur inconnue';
-      this.logger.error('Erreur OpenAIService:', errMsg);
+      const errMsg = error?.message ? String(error.message).slice(0, 300) : 'Erreur inconnue';
+      this.logger.error('Erreur OpenAIService:', errMsg, { sessionId: sessionIdFinal });
+      
+      // Sauvegarder l'erreur dans la session
+      await this.sessionService.saveMessage(sessionIdFinal, {
+        role: 'assistant',
+        content: `Erreur lors du traitement : ${errMsg}`,
+        timestamp: new Date().toISOString(),
+      });
+      
       return 'Erreur lors du traitement : ' + errMsg;
     }
+  }
+
+  // Méthode pour nettoyer les anciennes sessions
+  async cleanupOldSessions(maxAgeHours: number = 24): Promise<void> {
+    await this.sessionService.cleanupOldSessions(maxAgeHours);
+    this.logger.log(`Nettoyage des sessions de plus de ${maxAgeHours}h terminé`);
   }
 }
