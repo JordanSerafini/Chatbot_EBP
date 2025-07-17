@@ -5,9 +5,10 @@
   "license": "ISC",
   "author": "tinkerbell",
   "type": "commonjs",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
+    "start:dev": "electron ./src/main/main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {

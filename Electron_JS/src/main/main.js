@@ -1,8 +1,15 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+// Main process Electron sécurisé avec preload, logs, gestion fenêtres, etc.
+const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let robotWindow = null;
 let chatWindow = null;
+
+function log(action, details = {}) {
+  const logMsg = `[${new Date().toISOString()}] ${action} ${JSON.stringify(details)}\n`;
+  fs.appendFileSync(path.join(app.getPath('userData'), 'app.log'), logMsg);
+}
 
 function createRobotWindow() {
   const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
@@ -17,13 +24,17 @@ function createRobotWindow() {
     hasShadow: false,
     resizable: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      sandbox: true
     },
   });
-  robotWindow.loadFile(path.join(__dirname, 'robot.html'));
+  robotWindow.loadFile(path.join(__dirname, '../renderer/robot.html'));
   robotWindow.setIgnoreMouseEvents(false);
-  robotWindow.on('closed', () => { robotWindow = null; });
+  robotWindow.on('closed', () => { robotWindow = null; log('robotWindow.closed'); });
+  log('robotWindow.opened');
 }
 
 function createChatWindow() {
@@ -38,20 +49,26 @@ function createChatWindow() {
     alwaysOnTop: false,
     resizable: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      sandbox: true
     },
   });
-  chatWindow.loadFile(path.join(__dirname, 'chat.html'));
-  chatWindow.on('closed', () => { chatWindow = null; });
+  chatWindow.loadFile(path.join(__dirname, '../renderer/chat.html'));
+  chatWindow.on('closed', () => { chatWindow = null; log('chatWindow.closed'); });
+  log('chatWindow.opened');
 }
 
 app.whenReady().then(() => {
   createRobotWindow();
+  log('app.ready');
 
   ipcMain.on('open-chat', () => {
     if (robotWindow) robotWindow.close();
     createChatWindow();
+    log('open-chat');
   });
 
   app.on('activate', () => {
@@ -61,4 +78,5 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+  log('app.quit');
 }); 

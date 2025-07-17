@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Chatbot EBP</title>
+  <!-- Content Security Policy stricte -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' http://localhost:3001; font-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+  <div class="header">
+    <span>Chatbot EBP</span>
+    <div>
+      <button id="theme-toggle" class="theme-toggle" title="Changer le thème">🌓</button>
+      <button id="export-btn" class="export-btn" title="Exporter l'historique">⤓ Export</button>
+    </div>
+    <span id="status-dot" style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:10px;background:#FFA500;vertical-align:middle;"></span>
+  </div>
+  <div class="chat-container" id="chat">
+    <div class="bubble">Bonjour ! Comment puis-je vous aider ?</div>
+  </div>
+  <form class="input-container" id="form" autocomplete="off">
+    <textarea id="input" placeholder="Écrivez un message..." rows="1"></textarea>
+    <button type="submit">Envoyer</button>
+  </form>
+  <div class="examples" id="examples"></div>
+  <script src="theme.js"></script>
+  <script src="history.js"></script>
+  <script src="export.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html> 
