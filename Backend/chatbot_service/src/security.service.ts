@@ -6,8 +6,21 @@ export class SecurityService {
   
   // Mots-clés SQL dangereux à bloquer
   private readonly DANGEROUS_KEYWORDS = [
-    'DROP', 'DELETE', 'UPDATE', 'ALTER', 'TRUNCATE', 'CREATE', 'INSERT',
-    'GRANT', 'REVOKE', 'EXEC', 'EXECUTE', 'SP_', 'XP_', 'BACKUP', 'RESTORE'
+    'DROP',
+    'DELETE',
+    'UPDATE',
+    'ALTER',
+    'TRUNCATE',
+    'CREATE',
+    'INSERT',
+    'GRANT',
+    'REVOKE',
+    'EXEC',
+    'EXECUTE',
+    'SP_',
+    'XP_',
+    'BACKUP',
+    'RESTORE',
   ];
 
   // Tables sensibles à protéger
@@ -37,7 +50,8 @@ export class SecurityService {
       
       // Vérification des mots-clés dangereux
       for (const keyword of this.DANGEROUS_KEYWORDS) {
-        if (upperQuery.includes(keyword)) {
+        const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+        if (regex.test(upperQuery)) {
           this.logger.warn(`Requête bloquée - mot-clé dangereux: ${keyword}`, { sessionId, query });
           return { 
             isValid: false, 
