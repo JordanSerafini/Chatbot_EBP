@@ -28,4 +28,17 @@ export class AnalysisOrchestratorService {
       result,
     };
   }
+
+  /**
+   * Orchestration multi-analyses : permet d'enchaîner plusieurs requêtes/analyses pour enrichir la réponse
+   */
+  async orchestrateMultiAnalysis(queries: { query: string; tableNames: string[]; columns?: string[]; label?: string }[]): Promise<any[]> {
+    // Exécute chaque analyse en parallèle, retourne un tableau de résultats labellisés
+    return Promise.all(
+      queries.map(async ({ query, tableNames, columns, label }) => {
+        const result = await this.fullAnalysisWorkflow(query, tableNames, columns);
+        return { label, ...result };
+      })
+    );
+  }
 } 
