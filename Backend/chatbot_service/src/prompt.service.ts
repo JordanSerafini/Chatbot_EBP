@@ -1,18 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { injectVariables } from './utils/prompt-inject.util';
+import { sanitizeUserInput } from './utils/sanitize-input.util';
 
 export interface ChartData {
   [key: string]: string | number | Date;
-}
-
-function injectVariables(
-  template: string,
-  variables: Record<string, any>,
-): string {
-  return template.replace(/{{(\w+)}}/g, (_: string, key: string) =>
-    variables[key] !== undefined ? String(variables[key]) : `{{${key}}}`,
-  );
 }
 
 @Injectable()
@@ -29,6 +22,13 @@ export class PromptService {
     const path = join(this.promptDir, filename);
     const template = readFileSync(path, 'utf-8');
     return injectVariables(template, variables);
+  }
+
+  /**
+   * Sanitize une entrée utilisateur (anti-injection SQL/prompt)
+   */
+  sanitizeInput(input: string): { sanitized: string; flagged: boolean } {
+    return sanitizeUserInput(input);
   }
 
   /**
