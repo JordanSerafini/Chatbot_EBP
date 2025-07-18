@@ -2,16 +2,21 @@
 const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const fsp = require('fs').promises; // Importation asynchrone
 
 let robotWindow = null;
 let chatWindow = null;
 
-function log(action, details = {}) {
+async function log(action, details = {}) { // Rendre la fonction asynchrone
   const logMsg = `[${new Date().toISOString()}] ${action} ${JSON.stringify(details)}\n`;
-  fs.appendFileSync(path.join(app.getPath('userData'), 'app.log'), logMsg);
+  try {
+    await fsp.appendFile(path.join(app.getPath('userData'), 'app.log'), logMsg);
+  } catch (error) {
+    console.error('Failed to write to log file:', error);
+  }
 }
 
-function createRobotWindow() {
+async function  createRobotWindow() {
   const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
   const robotSize = 200;
   const margin = 20;
@@ -40,11 +45,11 @@ function createRobotWindow() {
   robotWindow.loadFile(path.join(__dirname, '../renderer/robot.html'));
   robotWindow.setIgnoreMouseEvents(false);
   robotWindow.once('ready-to-show', () => robotWindow.show());
-  robotWindow.on('closed', () => { robotWindow = null; log('robotWindow.closed'); });
-  log('robotWindow.opened');
+  robotWindow.on('closed', async () => { robotWindow = null; await log('robotWindow.closed'); });
+  await log('robotWindow.opened');
 }
 
-function createChatWindow() {
+async function createChatWindow() {
   const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
   chatWindow = new BrowserWindow({
     width: 400,
@@ -64,18 +69,18 @@ function createChatWindow() {
     },
   });
   chatWindow.loadFile(path.join(__dirname, '../renderer/chat.html'));
-  chatWindow.on('closed', () => { chatWindow = null; log('chatWindow.closed'); });
-  log('chatWindow.opened');
+  chatWindow.on('closed', async () => { chatWindow = null; await log('chatWindow.closed'); });
+  await log('chatWindow.opened');
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   createRobotWindow();
-  log('app.ready');
+  await log('app.ready');
 
-  ipcMain.on('open-chat', () => {
+  ipcMain.on('open-chat', async () => {
     if (robotWindow) robotWindow.close();
     createChatWindow();
-    log('open-chat');
+    await log('open-chat');
   });
 
   app.on('activate', () => {
@@ -83,7 +88,7 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   if (process.platform !== 'darwin') app.quit();
-  log('app.quit');
+  await log('app.quit');
 }); 

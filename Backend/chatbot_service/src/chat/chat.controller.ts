@@ -11,7 +11,10 @@ import {
 import { OpenAIService } from '../openai.service';
 import { SessionService } from '../session.service';
 import { SecurityService } from '../security.service';
-import { AnswerFormatterService, FormattedAnswer } from '../answer-formatter.service';
+import {
+  AnswerFormatterService,
+  FormattedAnswer,
+} from '../answer-formatter.service';
 
 interface AskRequest {
   question: string;
@@ -103,20 +106,37 @@ export class ChatController {
       let formattedResponse: FormattedAnswer | undefined;
       try {
         // Vérifier si la réponse contient des données JSON (cas où OpenAI a utilisé un outil)
-        const sessionMessages = await this.sessionService.getSession(sessionIdFinal);
+        const sessionMessages =
+          await this.sessionService.getSession(sessionIdFinal);
         const lastFunctionMessage = sessionMessages
           .filter((msg) => msg.role === 'function')
           .pop();
 
         if (lastFunctionMessage && lastFunctionMessage.content) {
-          const functionResult = JSON.parse(lastFunctionMessage.content) as any;
+          const functionResult = JSON.parse(lastFunctionMessage.content);
           if (
             functionResult.data &&
             Array.isArray(functionResult.data) &&
             functionResult.data.length > 0
           ) {
-            const { summary, tables, markdownTable, suggestions, exportLink, chartSuggestion, details } = functionResult.data[0];
-            formattedResponse = this.answerFormatter.format(summary, tables, markdownTable, suggestions, exportLink, chartSuggestion, details);
+            const {
+              summary,
+              tables,
+              markdownTable,
+              suggestions,
+              exportLink,
+              chartSuggestion,
+              details,
+            } = functionResult.data[0];
+            formattedResponse = this.answerFormatter.format(
+              summary,
+              tables,
+              markdownTable,
+              suggestions,
+              exportLink,
+              chartSuggestion,
+              details,
+            );
           }
         }
       } catch (formatError) {

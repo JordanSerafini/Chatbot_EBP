@@ -39,15 +39,9 @@ function setStatus(color, title) {
 }
 async function checkStatus() {
   setStatus('#FFA500', 'Vérification…');
-  try {
-    const res = await fetch('../main/config.json');
-    const { apiBaseUrl } = await res.json();
-    const ping = await fetch(apiBaseUrl, { method: 'GET' });
-    if (ping.ok) setStatus('#4CAF50', 'Connecté au chatbot');
-    else setStatus('#FF9800', 'Réponse inattendue du chatbot');
-  } catch {
-    setStatus('#F44336', 'Erreur de connexion au chatbot');
-  }
+  const isConnected = await window.apiService.checkApiStatus();
+  if (isConnected) setStatus('#4CAF50', 'Connecté au chatbot');
+  else setStatus('#F44336', 'Erreur de connexion au chatbot');
 }
 
 // --- Création dynamique des bulles ---
@@ -77,6 +71,18 @@ function createDataTable(data, columns) {
   return table;
 }
 
+// Fonction utilitaire pour créer un bouton de copie
+function createCopyButton(textToCopy, notificationMessage) {
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'copy-btn';
+  copyBtn.textContent = 'Copier';
+  copyBtn.onclick = () => {
+    window.electronAPI?.copyToClipboard(textToCopy);
+    showNotification(notificationMessage);
+  };
+  return copyBtn;
+}
+
 function createFormattedBubble(response, formattedResponse) {
   const bubble = document.createElement('div');
   let bubbleClass = 'bubble';
@@ -89,13 +95,7 @@ function createFormattedBubble(response, formattedResponse) {
   messageDiv.textContent = response.answer || 'Erreur : pas de réponse du bot';
   bubble.appendChild(messageDiv);
   // Bouton copier (réponse bot)
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'copy-btn';
-  copyBtn.textContent = 'Copier';
-  copyBtn.onclick = () => {
-    window.electronAPI?.copyToClipboard(messageDiv.textContent);
-    showNotification('Réponse copiée !');
-  };
+  const copyBtn = createCopyButton(messageDiv.textContent, 'Réponse copiée !');
   bubble.appendChild(copyBtn);
   // Tableaux structurés
   if (formattedResponse && formattedResponse.data && formattedResponse.data.length > 0) {
@@ -104,15 +104,10 @@ function createFormattedBubble(response, formattedResponse) {
     if (preview.length > 0) {
       const table = createDataTable(preview, columns);
       // Bouton copier pour le tableau
-      const tableCopyBtn = document.createElement('button');
-      tableCopyBtn.className = 'copy-btn';
-      tableCopyBtn.textContent = 'Copier';
-      tableCopyBtn.onclick = () => {
-        let csv = columns.join(',') + '\n';
-        csv += preview.map(row => columns.map(col => '"' + String(row[col]).replace(/"/g, '""') + '"').join(',')).join('\n');
-        window.electronAPI?.copyToClipboard(csv);
-        showNotification('Tableau copié !');
-      };
+      const tableCopyBtn = createCopyButton(
+        columns.join(',') + '\n' + preview.map(row => columns.map(col => `"${String(row[col]).replace(/"/g, '""')}"`).join(',')).join('\n'),
+        'Tableau copié !'
+      );
       table.style.position = 'relative';
       table.appendChild(tableCopyBtn);
       bubble.appendChild(table);
@@ -180,6 +175,12 @@ input.addEventListener('keydown', e => {
   }
 });
 
+// Redimensionnement automatique du champ de saisie
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = input.scrollHeight + 'px';
+});
+
 // --- Drag & Drop de fichier (CSV, Excel) ---
 chat.addEventListener('dragover', e => {
   e.preventDefault();
@@ -221,16 +222,8 @@ form.addEventListener('submit', async function(e) {
   showLoader();
   // Appel API backend
   try {
-    const resConf = await fetch('../main/config.json');
-    const { apiBaseUrl } = await resConf.json();
-    const response = await fetch(apiBaseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: text })
-    });
+    const data = await window.apiService.sendMessageToBot(text);
     hideLoader();
-    if (!response.ok) throw new Error('Erreur API');
-    const data = await response.json();
     // Ajout à l'historique local
     window.historyUtils.addMessageToHistory({ role: 'bot', response: data, formattedResponse: data.formattedResponse });
     const botBubble = createFormattedBubble(data, data.formattedResponse);
